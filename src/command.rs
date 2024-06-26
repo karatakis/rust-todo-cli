@@ -1,21 +1,24 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueHint};
+
+use crate::models::TaskStatusEnum;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = "A CLI applicatio to manage TODO tasks")]
+#[command(version, about = "A CLI applicatio to manage TODO tasks", long_about = None)]
 pub struct RootCommand {
     #[arg(
         short,
         long,
         value_name = "FILE",
         default_value = "data.db",
-        help = "Specifies the storage file"
+        help = "Specifies the storage file",
+        value_hint = ValueHint::FilePath,
     )]
-    file: PathBuf,
+    pub file: PathBuf,
 
     #[command(subcommand)]
-    command: Option<RootCommandsEnum>,
+    pub command: RootCommandsEnum,
 }
 
 #[derive(Subcommand, Debug)]
@@ -23,7 +26,7 @@ pub enum RootCommandsEnum {
     #[command(about = "All operations for tasks")]
     Task {
         #[command(subcommand)]
-        command: Option<TaskCommandsEnum>,
+        command: TaskCommandsEnum,
     },
     #[command(about = "Undo last operation")]
     Undo {
@@ -53,10 +56,10 @@ pub enum TaskCommandsEnum {
         )]
         deadline: Option<String>,
         // TODO add categories
-        #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
-        categories: Vec<String>,
-        #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value="undone", value_parser=["done", "undone", "completed"])]
-        status: String,
+        // #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
+        // categories: Vec<String>,
+        #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value=TaskStatusEnum::Undone)]
+        status: TaskStatusEnum,
         #[arg(
             long,
             short = 'a',
@@ -91,8 +94,8 @@ pub enum TaskCommandsEnum {
         // TODO add categories
         #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
         categories: Vec<String>,
-        #[arg(long, short, value_name = "STATUS", help = "Status of the task", value_parser=["done", "undone", "completed"])]
-        status: Option<String>,
+        #[arg(long, short, value_name = "STATUS", help = "Status of the task")]
+        status: Option<TaskStatusEnum>,
         #[arg(
             long,
             short = 'a',
@@ -106,8 +109,13 @@ pub enum TaskCommandsEnum {
     },
     #[command(about = "List all the tasks based on query filters")]
     List {
-        #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value="undone", value_parser=["done", "undone", "completed"])]
-        status: String,
+        #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value=TaskStatusEnum::Undone)]
+        status: TaskStatusEnum,
+        /*
+         * TODO:
+         * Sorting category, date
+         * Fuzzy search
+         */
     },
     #[command(about = "Read an existing task")]
     Read {
