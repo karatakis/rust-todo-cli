@@ -1,5 +1,8 @@
 use clap::ValueEnum;
-use rusqlite::{types::ToSqlOutput, ToSql};
+use rusqlite::{
+    types::{FromSql, ToSqlOutput},
+    ToSql,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum TaskStatusEnum {
@@ -36,6 +39,21 @@ impl ToSql for TaskStatusEnum {
         Ok(ToSqlOutput::Borrowed(rusqlite::types::ValueRef::Text(
             value.as_bytes(),
         )))
+    }
+}
+
+impl FromSql for TaskStatusEnum {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        let value: &str = value.as_str()?;
+
+        match value {
+            "done" => rusqlite::types::FromSqlResult::Ok(TaskStatusEnum::Done),
+            "undone" => rusqlite::types::FromSqlResult::Ok(TaskStatusEnum::Undone),
+            "archived" => rusqlite::types::FromSqlResult::Ok(TaskStatusEnum::Archived),
+            _ => rusqlite::types::FromSqlResult::Err(rusqlite::types::FromSqlError::Other(
+                anyhow::anyhow!("Could not convert '{}' to TaskStatusEnum", value).into(),
+            )),
+        }
     }
 }
 

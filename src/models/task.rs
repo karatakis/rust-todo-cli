@@ -44,4 +44,3 @@ pub struct UpdateTask {
     pub status: Option<TaskStatusEnum>,
     pub created_at: Option<Date>,
 }
-

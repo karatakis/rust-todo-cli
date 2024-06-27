@@ -65,7 +65,7 @@ pub enum TaskCommandsEnum {
             short = 'a',
             value_name = "DATE",
             help = "Creation date of the task",
-            default_value = "NOW"
+            default_value = "NOW",
         )]
         date: String,
     },
@@ -103,13 +103,13 @@ pub enum TaskCommandsEnum {
             help = "Creation date of the task"
         )]
         date: Option<String>,
-        // #[arg(short, long, help = "Force operation without confirmation")]
-        // force: bool,
+        #[arg(short, long, help = "Force operation without confirmation")]
+        force: bool,
     },
     #[command(about = "List all the tasks based on query filters")]
     List {
-        #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value=TaskStatusEnum::Undone)]
-        status: TaskStatusEnum,
+        #[arg(long, short, value_name = "STATUS", help = "Status of the task")]
+        status: Option<TaskStatusEnum>,
         /*
          * TODO:
          * Sorting category, date
