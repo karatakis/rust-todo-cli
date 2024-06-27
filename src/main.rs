@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use command::RootCommand;
-use models::AddTask;
+use models::{setup_database, AddTask};
 use repositories::task_repository::TaskRepository;
 use rusqlite::Connection;
 use time::{macros::format_description, Date};
@@ -59,23 +59,5 @@ fn main() -> Result<()> {
         command::RootCommandsEnum::Undo { force } => todo!(),
         command::RootCommandsEnum::Redo { force } => todo!(),
     }
-    Ok(())
-}
-
-fn setup_database(conn: &Connection) -> Result<()> {
-    conn.execute(
-        "
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            info TEXT,
-            deadline TEXT,
-            status TEXT NOT NULL,
-            created_at TEXT
-        );
-    ",
-        (),
-    )?;
-
     Ok(())
 }
