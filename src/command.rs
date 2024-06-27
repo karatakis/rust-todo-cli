@@ -92,20 +92,19 @@ pub enum TaskCommandsEnum {
         )]
         deadline: Option<String>,
         // TODO add categories
-        #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
-        categories: Vec<String>,
+        // #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
+        // categories: Vec<String>,
         #[arg(long, short, value_name = "STATUS", help = "Status of the task")]
         status: Option<TaskStatusEnum>,
         #[arg(
             long,
             short = 'a',
             value_name = "DATE",
-            help = "Creation date of the task",
-            default_value = "NOW"
+            help = "Creation date of the task"
         )]
         date: Option<String>,
-        #[arg(short, long, help = "Force operation without confirmation")]
-        force: bool,
+        // #[arg(short, long, help = "Force operation without confirmation")]
+        // force: bool,
     },
     #[command(about = "List all the tasks based on query filters")]
     List {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use command::RootCommand;
-use models::{setup_database, AddTask};
+use models::{setup_database, AddTask, UpdateTask};
 use repositories::task_repository::TaskRepository;
 use rusqlite::Connection;
 use time::{macros::format_description, Date};
@@ -28,12 +28,16 @@ fn main() -> Result<()> {
             } => {
                 let format = format_description!("[year]-[month]-[day]");
 
+                let deadline = deadline.map(|value| Date::parse(&value, &format).expect("Not reachable because variable verified before"));
+
+                let created_at = Date::parse(&date, &format).expect("Not reachable because variable verified before");
+
                 let task = AddTask {
                     title,
                     info,
-                    deadline: deadline.map(|value| Date::parse(&value, &format).expect("TODO")),
+                    deadline,
                     status,
-                    created_at: Date::parse(&date, &format)?,
+                    created_at,
                 };
 
                 let repository = TaskRepository::create(&conn);
@@ -48,11 +52,47 @@ fn main() -> Result<()> {
                 title,
                 info,
                 deadline,
-                categories,
+                // categories,
                 status,
                 date,
-                force,
-            } => todo!(),
+                // force,
+            } => {
+                let format = format_description!("[year]-[month]-[day]");
+
+                let info = info.map(|info| {
+                    if info == "" {
+                        None
+                    } else {
+                        Some(info)
+                    }
+                });
+
+                let deadline = deadline.map(|deadline| {
+                    if deadline == "" {
+                        None
+                    } else {
+                        Some(Date::parse(&deadline, &format).expect("Not reachable because variable verified before"))
+                    }
+                });
+
+                let created_at = date.map(|value| Date::parse(&value, &format).expect("Not reachable because variable verified before"));
+
+                let task = UpdateTask {
+                    id,
+                    title,
+                    info,
+                    deadline,
+                    status,
+                    created_at,
+                };
+
+                let repository = TaskRepository::create(&conn);
+
+                repository.edit_task(task)?;
+
+                // TODO use category
+                // TODO use force flag
+            },
             command::TaskCommandsEnum::List { status } => todo!(),
             command::TaskCommandsEnum::Read { id } => todo!(),
         },

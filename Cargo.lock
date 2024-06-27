@@ -330,6 +330,7 @@ dependencies = [
  "inherent",
  "sea-query-attr",
  "sea-query-derive",
+ "time",
 ]
 
 [[package]]

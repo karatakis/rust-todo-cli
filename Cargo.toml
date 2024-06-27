@@ -8,4 +8,4 @@ clap = { version = "4.5.7", features = ["derive"] }
 time = { version = "0.3.36" }
 rusqlite = { version = "0.31.0", features = ["bundled", "time"]  }
 anyhow = { version = "1.0" }
-sea-query = { version = "0.30.7", features = ["attr", "derive"] }
+sea-query = { version = "0.30.7", features = ["attr", "derive", "with-time"] }

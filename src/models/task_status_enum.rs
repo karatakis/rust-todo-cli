@@ -38,3 +38,9 @@ impl ToSql for TaskStatusEnum {
         )))
     }
 }
+
+impl Into<sea_query::SimpleExpr> for TaskStatusEnum {
+    fn into(self) -> sea_query::SimpleExpr {
+        self.to_string().into()
+    }
+}
