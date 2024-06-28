@@ -41,6 +41,11 @@ pub enum RootCommandsEnum {
         #[arg(short, long, help = "Force operation without confirmation")]
         force: bool,
     },
+    #[command(about = "List last actions")]
+    Actions {
+        #[arg(short, long, help = "Number of items to show", default_value = "10")]
+        limit: u64,
+    },
 }
 
 #[derive(Subcommand, Debug)]

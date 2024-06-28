@@ -170,6 +170,16 @@ fn main() -> Result<()> {
                 println!("Operation Canceled")
             }
         }
+        command::RootCommandsEnum::Actions { limit } => {
+            let repository = ActionRepository::create(&conn);
+
+            let actions = repository.fetch_actions(limit)?;
+
+            println!("========== ACTIONS ==========");
+            for action in actions {
+                println!("(#{}) - <{}> - [Restored: {}] - [{}]", action.id, action.action.to_string(), action.restored, action.created_at);
+            }
+        }
     }
     Ok(())
 }
