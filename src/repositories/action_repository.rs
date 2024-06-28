@@ -2,7 +2,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 use sea_query::{Expr, Query, SqliteQueryBuilder};
 
-use crate::models::{ActionEnum, ActionIden};
+use crate::models::{Action, ActionEnum, ActionIden};
 
 /**
  * Action database repository
@@ -45,5 +45,80 @@ impl<'a> ActionRepository<'a> {
         self.conn.execute(&sql, ())?;
 
         Ok(id)
+    }
+
+    /**
+     * Used to create a single (reversable) action record
+     */
+    pub fn update_action(&self, id: i64, action: ActionEnum, restored: bool) -> Result<()> {
+        let sql = Query::update()
+            .table(ActionIden::Table)
+            .values([
+                (ActionIden::Action, action.to_blob().into()),
+                (ActionIden::Restored, restored.into()),
+            ])
+            .and_where(Expr::col(ActionIden::Id).eq(id))
+            .to_string(SqliteQueryBuilder);
+        self.conn.execute(&sql, ())?;
+
+        Ok(())
+    }
+
+    /**
+     * Used to get the last non restored Action log record
+     */
+    pub fn get_last_unrestored_action(&self) -> Result<Action> {
+        let sql = Query::select()
+            .from(ActionIden::Table)
+            .columns([
+                ActionIden::Id,
+                ActionIden::Action,
+                ActionIden::Restored,
+                ActionIden::CreatedAt,
+            ])
+            .and_where(Expr::col(ActionIden::Restored).eq(false))
+            .order_by(ActionIden::Id, sea_query::Order::Desc)
+            .limit(1)
+            .to_string(SqliteQueryBuilder);
+
+        let action: Action = self.conn.query_row(&sql, (), |row| {
+            Ok(Action {
+                id: row.get(0)?,
+                action: row.get(1)?,
+                restored: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        Ok(action)
+    }
+
+    /**
+     * Used to get the last restored Action log record
+     */
+    pub fn get_fist_restored_action(&self) -> Result<Action> {
+        let sql = Query::select()
+            .from(ActionIden::Table)
+            .columns([
+                ActionIden::Id,
+                ActionIden::Action,
+                ActionIden::Restored,
+                ActionIden::CreatedAt,
+            ])
+            .and_where(Expr::col(ActionIden::Restored).eq(true))
+            .order_by(ActionIden::Id, sea_query::Order::Asc)
+            .limit(1)
+            .to_string(SqliteQueryBuilder);
+
+        let action: Action = self.conn.query_row(&sql, (), |row| {
+            Ok(Action {
+                id: row.get(0)?,
+                action: row.get(1)?,
+                restored: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        Ok(action)
     }
 }

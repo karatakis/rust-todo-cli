@@ -33,6 +33,16 @@ pub enum ActionTypeEnum {
     Delete,
 }
 
+impl ToString for ActionTypeEnum {
+    fn to_string(&self) -> String {
+        match self {
+            ActionTypeEnum::Create => "Create".into(),
+            ActionTypeEnum::Update => "Update".into(),
+            ActionTypeEnum::Delete => "Delete".into(),
+        }
+    }
+}
+
 #[derive(Debug, Encode, Decode)]
 pub enum ActionEnum {
     Task {
@@ -56,6 +66,25 @@ impl ActionEnum {
         let data: Vec<u8> = bincode::encode_to_vec(self, config).unwrap();
 
         data
+    }
+}
+
+impl ToString for ActionEnum {
+    fn to_string(&self) -> String {
+        match self {
+            ActionEnum::Task {
+                action_type,
+                id,
+                title: _,
+                info: _,
+                deadline: _,
+                status: _,
+                updated_at: _,
+                created_at: _,
+            } => {
+                format!("[Task] - (#{}) - [{}]", id, action_type.to_string())
+            }
+        }
     }
 }
 

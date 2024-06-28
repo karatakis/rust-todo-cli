@@ -94,6 +94,45 @@ impl<'a> TaskRepository<'a> {
     }
 
     /**
+     * Used to create a single task
+     */
+    pub fn create_task_with_id(&self, id: i64, task: AddTask) -> Result<Task> {
+        let sql = Query::insert()
+            .into_table(TaskIden::Table)
+            .columns([
+                TaskIden::Id,
+                TaskIden::Title,
+                TaskIden::Info,
+                TaskIden::Deadline,
+                TaskIden::Status,
+                TaskIden::UpdatedAt,
+                TaskIden::CreatedAt,
+            ])
+            .values([
+                id.into(),
+                task.title.clone().into(),
+                task.info.clone().into(),
+                task.deadline.into(),
+                task.status.into(),
+                task.created_at.into(),
+                task.created_at.into(),
+            ])?
+            .to_string(SqliteQueryBuilder);
+        self.conn.execute(&sql, ())?;
+        let id = self.conn.last_insert_rowid();
+
+        Ok(Task {
+            id,
+            title: task.title,
+            info: task.info,
+            deadline: task.deadline,
+            status: task.status,
+            updated_at: task.created_at,
+            created_at: task.created_at,
+        })
+    }
+
+    /**
      * Used to update a single task
      */
     pub fn update_task(&self, id: i64, new_task: UpdateTask, now: &str) -> Result<()> {

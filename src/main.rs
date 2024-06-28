@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::Parser;
 use command::RootCommand;
 use models::{setup_database, AddTask, UpdateTask};
-use repositories::{add_task, delete_task, edit_task, task_repository::TaskRepository};
+use repositories::{
+    action_repository::ActionRepository, add_task, delete_task, edit_task,
+    task_repository::TaskRepository, undo_redo_operation,
+};
 use rusqlite::Connection;
 use time::{macros::format_description, Date};
 
@@ -143,8 +146,30 @@ fn main() -> Result<()> {
                 }
             }
         },
-        command::RootCommandsEnum::Undo { force } => todo!(),
-        command::RootCommandsEnum::Redo { force } => todo!(),
+        command::RootCommandsEnum::Undo { force } => {
+            let repository = ActionRepository::create(&conn);
+
+            let action = repository.get_last_unrestored_action()?;
+            let proceed = ask_permission(&format!("Do you want to undo: {}? (y/N)", action.action.to_string()), force)?;
+            if proceed {
+                let result = undo_redo_operation(&mut conn, action)?;
+                println!("{}", result)
+            } else {
+                println!("Operation Canceled")
+            }
+        }
+        command::RootCommandsEnum::Redo { force } => {
+            let repository = ActionRepository::create(&conn);
+
+            let action = repository.get_fist_restored_action()?;
+            let proceed = ask_permission(&format!("Do you want to redo: {}? (y/N)", action.action.to_string()), force)?;
+            if proceed {
+                let result = undo_redo_operation(&mut conn, action)?;
+                println!("{}", result)
+            } else {
+                println!("Operation Canceled")
+            }
+        }
     }
     Ok(())
 }
