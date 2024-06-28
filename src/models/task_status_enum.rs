@@ -1,10 +1,11 @@
+use bincode::{Decode, Encode};
 use clap::ValueEnum;
 use rusqlite::{
     types::{FromSql, ToSqlOutput},
     ToSql,
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Encode, Decode)]
 pub enum TaskStatusEnum {
     Done,
     Undone,

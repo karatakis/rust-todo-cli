@@ -4,6 +4,9 @@ use clap::{Parser, Subcommand, ValueHint};
 
 use crate::models::TaskStatusEnum;
 
+/**
+ * The CLI parser of arguments
+ */
 #[derive(Parser, Debug)]
 #[command(version, about = "A CLI applicatio to manage TODO tasks", long_about = None)]
 pub struct RootCommand {
@@ -65,7 +68,7 @@ pub enum TaskCommandsEnum {
             short = 'a',
             value_name = "DATE",
             help = "Creation date of the task",
-            default_value = "NOW",
+            default_value = "NOW"
         )]
         date: String,
     },

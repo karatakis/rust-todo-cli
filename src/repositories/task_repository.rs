@@ -4,15 +4,24 @@ use sea_query::{Expr, Query, SqliteQueryBuilder};
 
 use crate::models::{AddTask, Task, TaskIden, UpdateTask};
 
+/**
+ * Task database repository
+ */
 pub struct TaskRepository<'a> {
     conn: &'a Connection,
 }
 
 impl<'a> TaskRepository<'a> {
+    /**
+     * Used to initialize the repository
+     */
     pub fn create(conn: &'a Connection) -> Self {
         Self { conn }
     }
 
+    /**
+     * Used to fetch a single task
+     */
     pub fn get_task(&self, id: i64) -> Result<Option<Task>> {
         let sql = Query::select()
             .from(TaskIden::Table)
@@ -22,6 +31,7 @@ impl<'a> TaskRepository<'a> {
                 TaskIden::Info,
                 TaskIden::Deadline,
                 TaskIden::Status,
+                TaskIden::UpdatedAt,
                 TaskIden::CreatedAt,
             ])
             .and_where(Expr::col(TaskIden::Id).eq(id))
@@ -34,7 +44,8 @@ impl<'a> TaskRepository<'a> {
                 info: row.get(2)?,
                 deadline: row.get(3)?,
                 status: row.get(4)?,
-                created_at: row.get(5)?,
+                updated_at: row.get(5)?,
+                created_at: row.get(6)?,
             })
         });
 
@@ -45,7 +56,10 @@ impl<'a> TaskRepository<'a> {
         }
     }
 
-    pub fn add_task(&self, task: AddTask) -> Result<Task> {
+    /**
+     * Used to create a single task
+     */
+    pub fn create_task(&self, task: AddTask) -> Result<Task> {
         let sql = Query::insert()
             .into_table(TaskIden::Table)
             .columns([
@@ -53,6 +67,7 @@ impl<'a> TaskRepository<'a> {
                 TaskIden::Info,
                 TaskIden::Deadline,
                 TaskIden::Status,
+                TaskIden::UpdatedAt,
                 TaskIden::CreatedAt,
             ])
             .values([
@@ -61,11 +76,10 @@ impl<'a> TaskRepository<'a> {
                 task.deadline.into(),
                 task.status.into(),
                 task.created_at.into(),
+                task.created_at.into(),
             ])?
             .to_string(SqliteQueryBuilder);
-
         self.conn.execute(&sql, ())?;
-
         let id = self.conn.last_insert_rowid();
 
         Ok(Task {
@@ -74,49 +88,69 @@ impl<'a> TaskRepository<'a> {
             info: task.info,
             deadline: task.deadline,
             status: task.status,
+            updated_at: task.created_at,
             created_at: task.created_at,
         })
     }
 
-    pub fn edit_task(&self, task: UpdateTask) -> Result<()> {
+    /**
+     * Used to update a single task
+     */
+    pub fn update_task(&self, id: i64, new_task: UpdateTask, now: &str) -> Result<()> {
+        let mut changes = 0;
+
         let mut sql = Query::update();
 
         sql.table(TaskIden::Table);
 
-        if let Some(title) = task.title {
+        // update only the changed fields
+        if let Some(title) = new_task.title {
             sql.value(TaskIden::Title, title);
+            changes += 1;
         }
 
-        if let Some(info) = task.info {
+        if let Some(info) = new_task.info {
             sql.value(TaskIden::Info, info);
+            changes += 1;
         }
 
-        if let Some(deadline) = task.deadline {
+        if let Some(deadline) = new_task.deadline {
             sql.value(TaskIden::Deadline, deadline);
+            changes += 1;
         }
 
-        if let Some(status) = task.status {
+        if let Some(status) = new_task.status {
             sql.value(TaskIden::Status, status);
+            changes += 1;
         }
 
-        if let Some(created_at) = task.created_at {
+        if let Some(created_at) = new_task.created_at {
             sql.value(TaskIden::CreatedAt, created_at);
+            changes += 1;
         }
 
-        sql.and_where(Expr::col(TaskIden::Id).eq(task.id));
+        // if no changes then return error
+        if changes > 0 {
+            sql.value(TaskIden::UpdatedAt, now);
+            sql.and_where(Expr::col(TaskIden::Id).eq(id));
+            let sql = sql.to_string(SqliteQueryBuilder);
+            self.conn.execute(&sql, ())?;
 
-        let sql = sql.to_string(SqliteQueryBuilder);
-
-        self.conn.execute(&sql, ())?;
-
-        Ok(())
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No changes found"))
+        }
     }
 
-    pub fn delete_task(&self, id: i64) -> Result<()> {
+    /**
+     * Used to update a single task
+     */
+    pub fn delete_task(&self, task: &Task) -> Result<()> {
         let sql = Query::delete()
             .from_table(TaskIden::Table)
-            .and_where(Expr::col(TaskIden::Id).eq(id))
+            .and_where(Expr::col(TaskIden::Id).eq(task.id))
             .to_string(SqliteQueryBuilder);
+
         self.conn.execute(&sql, ())?;
 
         Ok(())

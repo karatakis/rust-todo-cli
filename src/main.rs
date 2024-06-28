@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use command::RootCommand;
 use models::{setup_database, AddTask, UpdateTask};
-use repositories::task_repository::TaskRepository;
+use repositories::{add_task, delete_task, edit_task, task_repository::TaskRepository};
 use rusqlite::Connection;
 use time::{macros::format_description, Date};
 
@@ -13,13 +13,11 @@ mod repositories;
 fn main() -> Result<()> {
     let matches = RootCommand::parse();
 
-    let conn = Connection::open(&matches.file)?;
-
+    let mut conn = Connection::open(&matches.file)?;
     setup_database(&conn)?;
 
     match matches.command {
         command::RootCommandsEnum::Task { command } => match command {
-            // TODO validation
             command::TaskCommandsEnum::Add {
                 title,
                 info,
@@ -27,8 +25,6 @@ fn main() -> Result<()> {
                 status,
                 date,
             } => {
-                let repository = TaskRepository::create(&conn);
-
                 let deadline = parse_deadline(deadline)?;
                 let date = parse_date_now(&date);
                 let created_at = parse_created_at(date)?;
@@ -40,13 +36,12 @@ fn main() -> Result<()> {
                     created_at,
                 };
 
-                let task = repository.add_task(task)?;
+                let task = add_task(&mut conn, task)?;
 
                 println!("[TASK CREATED] (#{}) - [{}]", task.id, task.title);
             }
             command::TaskCommandsEnum::Delete { id, force } => {
                 let repository = TaskRepository::create(&conn);
-
                 let task = match repository.get_task(id)? {
                     Some(task) => task,
                     None => return Err(anyhow::anyhow!("Task with id (#{}) not found!", id).into()),
@@ -61,7 +56,7 @@ fn main() -> Result<()> {
                 )?;
 
                 if proceed {
-                    repository.delete_task(id)?;
+                    delete_task(&mut conn, &task)?;
                     println!("[TASK DELETED] (#{}) - [{}]", id, task.title);
                 } else {
                     println!("Operation Canceled")
@@ -79,22 +74,23 @@ fn main() -> Result<()> {
             } => {
                 let repository = TaskRepository::create(&conn);
 
-                let existing_task = match repository.get_task(id)? {
+                let old_task = match repository.get_task(id)? {
                     Some(existing_task) => existing_task,
                     None => return Err(anyhow::anyhow!("Task with id (#{}) not found!", id).into()),
                 };
 
                 let info = info.map(|info| if info == "" { None } else { Some(info) });
-                let deadline = deadline.map(|deadline| -> anyhow::Result<Option<Date>> {
-                    if deadline == "" {
-                        Ok(None)
-                    } else {
-                        parse_deadline(Some(deadline))
-                    }
-                }).transpose()?;
+                let deadline = deadline
+                    .map(|deadline| -> anyhow::Result<Option<Date>> {
+                        if deadline == "" {
+                            Ok(None)
+                        } else {
+                            parse_deadline(Some(deadline))
+                        }
+                    })
+                    .transpose()?;
                 let created_at = date.map(parse_created_at).transpose()?;
-                let task = UpdateTask {
-                    id,
+                let new_task = UpdateTask {
                     title,
                     info,
                     deadline,
@@ -105,14 +101,13 @@ fn main() -> Result<()> {
                 let proceed = ask_permission(
                     &format!(
                         "Do you want to update task (#{}) - [{}]? (y/N)",
-                        id, existing_task.title
+                        id, old_task.title
                     ),
                     force,
                 )?;
 
                 if proceed {
-                    repository.edit_task(task)?;
-                    let task = repository.get_task(id)?.expect("Task already exists");
+                    let task = edit_task(&mut conn, id, old_task, new_task)?;
                     println!("[TASK UPDATED] (#{}) - [{}]", id, task.title);
                 } else {
                     println!("Operation Canceled")
@@ -141,6 +136,7 @@ fn main() -> Result<()> {
                         }
                         println!("status: {}", task.status.to_string());
                         println!("Created At: {}", task.created_at);
+                        println!("Updated At: {}", task.updated_at);
                         println!("{}", "=".repeat(header.len()));
                     }
                     None => return Err(anyhow::anyhow!("Task with id (#{}) not found!", id).into()),
@@ -153,6 +149,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/**
+ * Used to ask user for confirmation of action
+ */
 fn ask_permission(message: &str, force: bool) -> Result<bool> {
     if force {
         return Ok(true);
@@ -184,9 +183,9 @@ fn get_date_format() -> &'static [time::format_description::BorrowedFormatItem<'
 fn parse_deadline(deadline: Option<String>) -> anyhow::Result<Option<Date>> {
     let format = get_date_format();
 
-    deadline.map(|value| -> anyhow::Result<Date> {
-        Ok(Date::parse(&value, &format)?)
-    }).transpose()
+    deadline
+        .map(|value| -> anyhow::Result<Date> { Ok(Date::parse(&value, &format)?) })
+        .transpose()
 }
 
 fn parse_created_at(created_at: String) -> anyhow::Result<Date> {
@@ -198,9 +197,12 @@ fn parse_created_at(created_at: String) -> anyhow::Result<Date> {
     }
 }
 
+/**
+ * Used to convert string "NOW" to Date struct
+ */
 fn parse_date_now(date: &str) -> String {
-    use time::OffsetDateTime;
     use std::time::SystemTime;
+    use time::OffsetDateTime;
 
     if date.eq("NOW") {
         // Get current time
