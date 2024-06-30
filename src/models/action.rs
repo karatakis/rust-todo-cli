@@ -51,11 +51,28 @@ pub enum ActionEnum {
         title: String,
         info: Option<String>,
         deadline: Option<String>,
-        // TODO
-        // categories: Vec<i64>,
+        categories: Option<Vec<String>>,
         status: TaskStatusEnum,
         updated_at: String,
         created_at: String,
+    },
+    Category {
+        action_type: ActionTypeEnum,
+        category: String,
+        task_id: i64,
+    },
+    RenameTaskCategory {
+        old_category: String,
+        new_category: String,
+        task_id: i64,
+    },
+    BatchCategoryDelete {
+        task_ids: Vec<i64>,
+        category: String,
+    },
+    BatchCategoryRename {
+        old_category: String,
+        new_category: String,
     },
 }
 
@@ -78,11 +95,49 @@ impl ToString for ActionEnum {
                 title: _,
                 info: _,
                 deadline: _,
+                categories: _,
                 status: _,
                 updated_at: _,
                 created_at: _,
             } => {
-                format!("[Task] - (#{}) - [{}]", id, action_type.to_string())
+                format!("[Task][{}] - (#{})", action_type.to_string(), id)
+            }
+            ActionEnum::Category {
+                action_type,
+                category,
+                task_id,
+            } => {
+                format!(
+                    "[Category][{}] - (#{}) - [Task: {}]",
+                    action_type.to_string(),
+                    category,
+                    task_id
+                )
+            }
+            ActionEnum::RenameTaskCategory {
+                old_category,
+                new_category,
+                task_id,
+            } => {
+                format!(
+                    "[Category][Rename] - (From: {}) - (To: {}) - [Task: {}]",
+                    old_category, new_category, task_id
+                )
+            }
+            ActionEnum::BatchCategoryDelete {
+                task_ids: _,
+                category,
+            } => {
+                format!("[Category][Batch][Delete] - (#{})", category)
+            }
+            ActionEnum::BatchCategoryRename {
+                old_category,
+                new_category,
+            } => {
+                format!(
+                    "[Category][Batch][Rename] - (From: {}) - (To: {})",
+                    old_category, new_category
+                )
             }
         }
     }

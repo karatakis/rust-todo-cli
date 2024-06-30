@@ -9,10 +9,7 @@ pub struct Task {
     pub title: String,
     pub info: Option<String>,
     pub deadline: Option<Date>,
-    // TODO
-    // categories: Vec<TaskCategory>,
-    // TODO
-    // comments: Vec<TaskComment>,
+    pub categories: Option<Vec<String>>,
     pub status: TaskStatusEnum,
     pub updated_at: Date,
     pub created_at: Date,
@@ -36,10 +33,7 @@ pub struct AddTask {
     pub title: String,
     pub info: Option<String>,
     pub deadline: Option<Date>,
-    // TODO
-    // categories: Vec<TaskCategory>,
-    // TODO
-    // comments: Vec<TaskComment>,
+    pub categories: Option<Vec<String>>,
     pub status: TaskStatusEnum,
     pub created_at: Date,
 }
@@ -49,10 +43,6 @@ pub struct UpdateTask {
     pub title: Option<String>,
     pub info: Option<Option<String>>,
     pub deadline: Option<Option<Date>>,
-    // TODO
-    // categories: Vec<TaskCategory>,
-    // TODO
-    // comments: Vec<TaskComment>,
     pub status: Option<TaskStatusEnum>,
     pub created_at: Option<Date>,
 }

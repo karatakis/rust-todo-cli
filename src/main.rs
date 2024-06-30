@@ -3,15 +3,16 @@ use clap::Parser;
 use command::RootCommand;
 use models::{setup_database, AddTask, UpdateTask};
 use repositories::{
-    action_repository::ActionRepository, add_task, delete_task, edit_task,
-    task_repository::TaskRepository, undo_redo_operation,
+    action_repository::ActionRepository, category_repository::CategoryRepository,
+    task_repository::TaskRepository,
 };
 use rusqlite::Connection;
-use time::{macros::format_description, Date};
+use utils::ask_permission;
 
 mod command;
 mod models;
 mod repositories;
+mod utils;
 
 fn main() -> Result<()> {
     let matches = RootCommand::parse();
@@ -27,21 +28,20 @@ fn main() -> Result<()> {
                 deadline,
                 status,
                 date,
+                categories,
             } => {
-                let deadline = parse_deadline(deadline)?;
-                let date = parse_date_now(&date);
-                let created_at = parse_created_at(date)?;
                 let task = AddTask {
                     title,
                     info,
                     deadline,
                     status,
-                    created_at,
+                    created_at: date,
+                    categories,
                 };
 
-                let task = add_task(&mut conn, task)?;
+                let task = repositories::add_task(&mut conn, task)?;
 
-                println!("[TASK CREATED] (#{}) - [{}]", task.id, task.title);
+                println!("[Task][Create] - (#{}) - [{}]", task.id, task.title);
             }
             command::TaskCommandsEnum::Delete { id, force } => {
                 let repository = TaskRepository::create(&conn);
@@ -59,8 +59,8 @@ fn main() -> Result<()> {
                 )?;
 
                 if proceed {
-                    delete_task(&mut conn, &task)?;
-                    println!("[TASK DELETED] (#{}) - [{}]", id, task.title);
+                    repositories::delete_task(&mut conn, &task)?;
+                    println!("[Task][Delete] - (#{}) - [{}]", id, task.title);
                 } else {
                     println!("Operation Canceled")
                 }
@@ -83,22 +83,13 @@ fn main() -> Result<()> {
                 };
 
                 let info = info.map(|info| if info == "" { None } else { Some(info) });
-                let deadline = deadline
-                    .map(|deadline| -> anyhow::Result<Option<Date>> {
-                        if deadline == "" {
-                            Ok(None)
-                        } else {
-                            parse_deadline(Some(deadline))
-                        }
-                    })
-                    .transpose()?;
-                let created_at = date.map(parse_created_at).transpose()?;
+
                 let new_task = UpdateTask {
                     title,
                     info,
                     deadline,
                     status,
-                    created_at,
+                    created_at: date,
                 };
 
                 let proceed = ask_permission(
@@ -110,8 +101,8 @@ fn main() -> Result<()> {
                 )?;
 
                 if proceed {
-                    let task = edit_task(&mut conn, id, old_task, new_task)?;
-                    println!("[TASK UPDATED] (#{}) - [{}]", id, task.title);
+                    let task = repositories::edit_task(&mut conn, id, old_task, new_task)?;
+                    println!("[Task][Updated] (#{}) - [{}]", id, task.title);
                 } else {
                     println!("Operation Canceled")
                 }
@@ -119,9 +110,13 @@ fn main() -> Result<()> {
             command::TaskCommandsEnum::List { status } => todo!(),
             command::TaskCommandsEnum::Read { id } => {
                 let repository = TaskRepository::create(&conn);
+                let category_repository = CategoryRepository::create(&conn);
+
 
                 match repository.get_task(id)? {
                     Some(task) => {
+                        // TODO fix this
+                        let categories = category_repository.fetch_task_categories(id)?;
                         let header = format!("=== (#{}) [{}] ===", id, task.title);
                         println!("{}", header);
                         println!("{}", "=".repeat(header.len()));
@@ -140,6 +135,9 @@ fn main() -> Result<()> {
                         println!("status: {}", task.status.to_string());
                         println!("Created At: {}", task.created_at);
                         println!("Updated At: {}", task.updated_at);
+                        if categories.len() > 0 {
+                            println!("Categories: {}", categories.join(", "));
+                        }
                         println!("{}", "=".repeat(header.len()));
                     }
                     None => return Err(anyhow::anyhow!("Task with id (#{}) not found!", id).into()),
@@ -150,9 +148,12 @@ fn main() -> Result<()> {
             let repository = ActionRepository::create(&conn);
 
             let action = repository.get_last_unrestored_action()?;
-            let proceed = ask_permission(&format!("Do you want to undo: {}? (y/N)", action.action.to_string()), force)?;
+            let proceed = ask_permission(
+                &format!("Do you want to undo: {}? (y/N)", action.action.to_string()),
+                force,
+            )?;
             if proceed {
-                let result = undo_redo_operation(&mut conn, action)?;
+                let result = repositories::undo_redo_operation(&mut conn, action)?;
                 println!("{}", result)
             } else {
                 println!("Operation Canceled")
@@ -162,9 +163,12 @@ fn main() -> Result<()> {
             let repository = ActionRepository::create(&conn);
 
             let action = repository.get_fist_restored_action()?;
-            let proceed = ask_permission(&format!("Do you want to redo: {}? (y/N)", action.action.to_string()), force)?;
+            let proceed = ask_permission(
+                &format!("Do you want to redo: {}? (y/N)", action.action.to_string()),
+                force,
+            )?;
             if proceed {
-                let result = undo_redo_operation(&mut conn, action)?;
+                let result = repositories::undo_redo_operation(&mut conn, action)?;
                 println!("{}", result)
             } else {
                 println!("Operation Canceled")
@@ -177,76 +181,71 @@ fn main() -> Result<()> {
 
             println!("========== ACTIONS ==========");
             for action in actions {
-                println!("(#{}) - <{}> - [Restored: {}] - [{}]", action.id, action.action.to_string(), action.restored, action.created_at);
+                println!(
+                    "(#{}) - <{}> - [Restored: {}] - [{}]",
+                    action.id,
+                    action.action.to_string(),
+                    action.restored,
+                    action.created_at
+                );
             }
         }
+        command::RootCommandsEnum::Category { command } => match command {
+            command::CategoryCommandsEnum::List => {
+                let repository = CategoryRepository::create(&conn);
+
+                let categories = repository.all_categories()?;
+
+                println!("========== Categories ==========");
+                for category in categories {
+                    println!("(#{}) - [Count: {}]", category.0, category.1);
+                }
+            }
+            command::CategoryCommandsEnum::Add { task_id, category } => {
+                repositories::add_category_to_task(&mut conn, task_id, &category)?;
+                println!(
+                    "[Category][Created] - (#{}) - [Task: {}]",
+                    category, task_id
+                );
+            }
+            command::CategoryCommandsEnum::Rename {
+                task_id,
+                old_category,
+                new_category,
+            } => {
+                repositories::rename_task_category(
+                    &mut conn,
+                    task_id,
+                    &old_category,
+                    &new_category,
+                )?;
+                println!(
+                    "[Category][Renamed] - (From: {}) - (To: {}) - [Task: {}]",
+                    old_category, new_category, task_id
+                );
+            }
+            command::CategoryCommandsEnum::Remove { task_id, category } => {
+                repositories::remove_task_category(&mut conn, task_id, &category)?;
+                println!(
+                    "[Category][Removed] - (#{}) - [Task: {}]",
+                    category, task_id
+                );
+            }
+            command::CategoryCommandsEnum::BatchRename {
+                old_category,
+                new_category,
+            } => {
+                repositories::batch_rename_category(&mut conn, &old_category, &new_category)?;
+                println!(
+                    "[Category][Batch][Rename] - (From: {}) - (To: {})",
+                    old_category, new_category
+                );
+            }
+            command::CategoryCommandsEnum::BatchDelete { category } => {
+                repositories::batch_delete_category(&mut conn, &category)?;
+                println!("[Category][Batch][Delete] - (#{})", category);
+            }
+        },
     }
     Ok(())
-}
-
-/**
- * Used to ask user for confirmation of action
- */
-fn ask_permission(message: &str, force: bool) -> Result<bool> {
-    if force {
-        return Ok(true);
-    }
-
-    println!("{}", message);
-
-    let mut input = String::new();
-
-    std::io::stdin().read_line(&mut input)?;
-
-    let trimmed_input = input.trim().to_lowercase();
-
-    match trimmed_input.as_str() {
-        "y" | "yes" => Ok(true),
-        "n" | "no" => Ok(false),
-        _ => {
-            return Err(
-                anyhow::anyhow!("Invalid input. Please enter 'y', 'n', 'Y', or 'N'.").into(),
-            )
-        }
-    }
-}
-
-fn get_date_format() -> &'static [time::format_description::BorrowedFormatItem<'static>] {
-    format_description!("[year]-[month]-[day]")
-}
-
-fn parse_deadline(deadline: Option<String>) -> anyhow::Result<Option<Date>> {
-    let format = get_date_format();
-
-    deadline
-        .map(|value| -> anyhow::Result<Date> { Ok(Date::parse(&value, &format)?) })
-        .transpose()
-}
-
-fn parse_created_at(created_at: String) -> anyhow::Result<Date> {
-    let format = get_date_format();
-
-    match Date::parse(&created_at, &format) {
-        Ok(created_at) => Ok(created_at),
-        Err(_) => Err(anyhow::anyhow!("Invalid date: {}", created_at)),
-    }
-}
-
-/**
- * Used to convert string "NOW" to Date struct
- */
-fn parse_date_now(date: &str) -> String {
-    use std::time::SystemTime;
-    use time::OffsetDateTime;
-
-    if date.eq("NOW") {
-        // Get current time
-        let now = SystemTime::now();
-        let now = OffsetDateTime::from(now).date();
-        // Format the date as YYYY-MM-DD
-        let now = now.to_string();
-        now
-    } else {
-        date.to_string()
-    }
 }

@@ -124,27 +124,29 @@ impl<'a> ActionRepository<'a> {
 
     pub fn fetch_actions(&self, limit: u64) -> Result<Vec<Action>> {
         let sql = Query::select()
-        .from(ActionIden::Table)
-        .columns([
-            ActionIden::Id,
-            ActionIden::Action,
-            ActionIden::Restored,
-            ActionIden::CreatedAt,
-        ])
-        .order_by(ActionIden::Id, sea_query::Order::Desc)
-        .limit(limit)
-        .to_string(SqliteQueryBuilder);
+            .from(ActionIden::Table)
+            .columns([
+                ActionIden::Id,
+                ActionIden::Action,
+                ActionIden::Restored,
+                ActionIden::CreatedAt,
+            ])
+            .order_by(ActionIden::Id, sea_query::Order::Desc)
+            .limit(limit)
+            .to_string(SqliteQueryBuilder);
 
         let mut stmt = self.conn.prepare(&sql)?;
 
-        let rows = stmt.query_map((), |row| {
-            Ok(Action {
-                id: row.get(0)?,
-                action: row.get(1)?,
-                restored: row.get(2)?,
-                created_at: row.get(3)?,
-            })
-        })?.collect::<Result<Vec<Action>, _>>()?;
+        let rows = stmt
+            .query_map((), |row| {
+                Ok(Action {
+                    id: row.get(0)?,
+                    action: row.get(1)?,
+                    restored: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<Action>, _>>()?;
 
         Ok(rows)
     }

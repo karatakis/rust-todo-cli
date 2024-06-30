@@ -46,6 +46,7 @@ impl<'a> TaskRepository<'a> {
                 status: row.get(4)?,
                 updated_at: row.get(5)?,
                 created_at: row.get(6)?,
+                categories: None,
             })
         });
 
@@ -90,11 +91,12 @@ impl<'a> TaskRepository<'a> {
             status: task.status,
             updated_at: task.created_at,
             created_at: task.created_at,
+            categories: None,
         })
     }
 
     /**
-     * Used to create a single task
+     * Used to create a single task with specified id
      */
     pub fn create_task_with_id(&self, id: i64, task: AddTask) -> Result<Task> {
         let sql = Query::insert()
@@ -129,6 +131,7 @@ impl<'a> TaskRepository<'a> {
             status: task.status,
             updated_at: task.created_at,
             created_at: task.created_at,
+            categories: None,
         })
     }
 

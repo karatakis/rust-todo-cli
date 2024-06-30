@@ -1,16 +1,18 @@
-pub mod action_repository;
-pub mod task_repository;
-
 use action_repository::ActionRepository;
 use anyhow::Result;
+use category_repository::CategoryRepository;
 use rusqlite::Connection;
 use std::time::SystemTime;
 use task_repository::TaskRepository;
 use time::{Date, OffsetDateTime};
 
+pub mod action_repository;
+pub mod category_repository;
+pub mod task_repository;
+
 use crate::{
     models::{Action, ActionEnum, ActionTypeEnum, AddTask, Task, UpdateTask},
-    parse_created_at, parse_deadline,
+    utils::{created_at_parser, date_parser},
 };
 
 /**
@@ -23,7 +25,7 @@ fn get_now() -> Date {
 }
 
 /**
- * Used to create a Task and its respective Action
+ * Used to create a Task and create its respective Action
  */
 pub fn add_task(conn: &mut Connection, task: AddTask) -> Result<Task> {
     let trx = conn.transaction()?;
@@ -31,8 +33,14 @@ pub fn add_task(conn: &mut Connection, task: AddTask) -> Result<Task> {
 
     let task_repository = TaskRepository::create(&trx);
     let action_repository = ActionRepository::create(&trx);
+    let category_repository = CategoryRepository::create(&trx);
 
+    let categories = task.categories.clone();
     let task = task_repository.create_task(task)?;
+
+    if let Some(categories) = categories {
+        category_repository.batch_create_task_categories(task.id, &categories)?;
+    }
 
     let action = ActionEnum::Task {
         action_type: ActionTypeEnum::Create,
@@ -43,6 +51,7 @@ pub fn add_task(conn: &mut Connection, task: AddTask) -> Result<Task> {
         status: task.status,
         updated_at: now.to_string(),
         created_at: task.created_at.to_string(),
+        categories: task.categories.clone(),
     };
     action_repository.create_action(action, &now.to_string())?;
 
@@ -52,7 +61,7 @@ pub fn add_task(conn: &mut Connection, task: AddTask) -> Result<Task> {
 }
 
 /**
- * Used to edit a Task and its respective Action
+ * Used to edit a Task and create its respective Action
  */
 pub fn edit_task(
     conn: &mut Connection,
@@ -77,6 +86,7 @@ pub fn edit_task(
         status: old_task.status,
         updated_at: old_task.updated_at.to_string(),
         created_at: old_task.created_at.to_string(),
+        categories: None,
     };
     action_repository.create_action(action, &now.to_string())?;
 
@@ -96,9 +106,13 @@ pub fn delete_task(conn: &mut Connection, task: &Task) -> Result<()> {
 
     let task_repository = TaskRepository::create(&trx);
     let action_repository = ActionRepository::create(&trx);
+    let category_repository = CategoryRepository::create(&trx);
 
     task_repository.delete_task(task)?;
 
+    // TODO fix this
+    let categories = category_repository.fetch_task_categories(task.id)?;
+    // TODO category_repository.batch_delete_category(category)
     let action = ActionEnum::Task {
         action_type: ActionTypeEnum::Delete,
         id: task.id,
@@ -108,6 +122,7 @@ pub fn delete_task(conn: &mut Connection, task: &Task) -> Result<()> {
         status: task.status,
         updated_at: task.updated_at.to_string(),
         created_at: task.created_at.to_string(),
+        categories: Some(categories),
     };
     action_repository.create_action(action, &now.to_string())?;
 
@@ -121,8 +136,11 @@ pub fn undo_redo_operation(conn: &mut Connection, action: Action) -> Result<Stri
 
     let task_repository = TaskRepository::create(&trx);
     let action_repository = ActionRepository::create(&trx);
+    let category_repository = CategoryRepository::create(&trx);
 
-    let result: String = match action.action {
+    let message = action.action.to_string();
+
+    match action.action {
         ActionEnum::Task {
             action_type,
             id: task_id,
@@ -132,6 +150,7 @@ pub fn undo_redo_operation(conn: &mut Connection, action: Action) -> Result<Stri
             status,
             updated_at,
             created_at,
+            categories,
         } => match action_type {
             ActionTypeEnum::Create => {
                 let task = task_repository
@@ -149,10 +168,10 @@ pub fn undo_redo_operation(conn: &mut Connection, action: Action) -> Result<Stri
                         status,
                         updated_at,
                         created_at,
+                        categories,
                     },
                     !action.restored,
                 )?;
-                format!("[Undo][Task][Create] - (#{}) - [{}]", task_id, title)
             }
             ActionTypeEnum::Update => {
                 let old_task = task_repository
@@ -161,9 +180,9 @@ pub fn undo_redo_operation(conn: &mut Connection, action: Action) -> Result<Stri
                 let new_task = UpdateTask {
                     title: Some(title.clone()),
                     info: Some(info),
-                    deadline: Some(parse_deadline(deadline)?),
+                    deadline: Some(deadline.map(|v| date_parser(&v)).transpose()?),
                     status: Some(status),
-                    created_at: Some(parse_created_at(created_at)?),
+                    created_at: Some(created_at_parser(&created_at)?),
                 };
                 task_repository.update_task(task_id, new_task, &updated_at)?;
                 let new_action = ActionEnum::Task {
@@ -175,39 +194,239 @@ pub fn undo_redo_operation(conn: &mut Connection, action: Action) -> Result<Stri
                     status: old_task.status,
                     updated_at: old_task.updated_at.to_string(),
                     created_at: old_task.created_at.to_string(),
+                    categories,
                 };
                 action_repository.update_action(action.id, new_action, !action.restored)?;
-                format!("[Undo][Task][Update] - (#{}) - [{}]", task_id, title)
             }
             ActionTypeEnum::Delete => {
                 let new_task = AddTask {
                     title: title.clone(),
                     info: info.clone(),
-                    deadline: parse_deadline(deadline.clone())?,
+                    deadline: deadline.clone().map(|v| date_parser(&v)).transpose()?,
                     status: status,
-                    created_at: parse_created_at(created_at.clone())?,
+                    created_at: created_at_parser(&created_at)?,
+                    categories: categories.clone(),
                 };
-                let task = task_repository.create_task_with_id(task_id, new_task)?;
+                let _ = task_repository.create_task_with_id(task_id, new_task)?;
                 action_repository.update_action(
                     action.id,
                     ActionEnum::Task {
                         action_type: ActionTypeEnum::Create,
                         id: task_id,
-                        title: title.clone(),
+                        title,
                         info,
                         deadline,
                         status,
                         updated_at,
                         created_at,
+                        categories,
                     },
                     !action.restored,
                 )?;
-                format!("[Undo][Task][Created] - (#{}) - [{}]", task.id, title)
             }
         },
+        ActionEnum::Category {
+            action_type,
+            category,
+            task_id,
+        } => match action_type {
+            ActionTypeEnum::Create => {
+                category_repository.delete_category(task_id, &category)?;
+                action_repository.update_action(
+                    action.id,
+                    ActionEnum::Category {
+                        action_type: ActionTypeEnum::Delete,
+                        category,
+                        task_id,
+                    },
+                    !action.restored,
+                )?;
+            }
+            ActionTypeEnum::Update => {
+                return Err(anyhow::anyhow!(
+                    "Operation update not permitted for category!"
+                ))
+            }
+            ActionTypeEnum::Delete => {
+                category_repository.create_category(task_id, &category)?;
+                action_repository.update_action(
+                    action.id,
+                    ActionEnum::Category {
+                        action_type: ActionTypeEnum::Create,
+                        category,
+                        task_id,
+                    },
+                    !action.restored,
+                )?;
+            }
+        },
+        ActionEnum::RenameTaskCategory {
+            old_category,
+            new_category,
+            task_id,
+        } => {
+            category_repository.rename_category(task_id, &new_category, &old_category)?;
+            action_repository.update_action(
+                action.id,
+                ActionEnum::RenameTaskCategory {
+                    new_category: old_category,
+                    old_category: new_category,
+                    task_id,
+                },
+                !action.restored,
+            )?;
+        }
+        ActionEnum::BatchCategoryDelete { task_ids, category } => {
+            category_repository.batch_create_category(&task_ids, &category)?;
+            action_repository.update_action(
+                action.id,
+                ActionEnum::BatchCategoryDelete {
+                    task_ids: task_ids,
+                    category: category,
+                },
+                !action.restored,
+            )?;
+        }
+        ActionEnum::BatchCategoryRename {
+            old_category,
+            new_category,
+        } => {
+            category_repository.batch_rename_category(&new_category, &old_category)?;
+            action_repository.update_action(
+                action.id,
+                ActionEnum::BatchCategoryRename {
+                    old_category: new_category,
+                    new_category: old_category,
+                },
+                !action.restored,
+            )?;
+        }
     };
 
     trx.commit()?;
 
-    Ok(result)
+    Ok(format!("[Undo]{}", message))
+}
+
+pub fn add_category_to_task(conn: &mut Connection, task_id: i64, category: &str) -> Result<()> {
+    let trx = conn.transaction()?;
+    let now = get_now();
+
+    let category_repository = CategoryRepository::create(&trx);
+    let action_repository = ActionRepository::create(&trx);
+
+    category_repository.create_category(task_id, category)?;
+
+    action_repository.create_action(
+        ActionEnum::Category {
+            action_type: ActionTypeEnum::Create,
+            category: category.to_string(),
+            task_id,
+        },
+        &now.to_string(),
+    )?;
+
+    trx.commit()?;
+
+    Ok(())
+}
+
+pub fn rename_task_category(
+    conn: &mut Connection,
+    task_id: i64,
+    old_category: &str,
+    new_category: &str,
+) -> Result<()> {
+    let trx = conn.transaction()?;
+    let now = get_now();
+
+    let category_repository = CategoryRepository::create(&trx);
+    let action_repository = ActionRepository::create(&trx);
+
+    category_repository.rename_category(task_id, old_category, new_category)?;
+
+    action_repository.create_action(
+        ActionEnum::RenameTaskCategory {
+            old_category: old_category.to_string(),
+            new_category: new_category.to_string(),
+            task_id: task_id,
+        },
+        &now.to_string(),
+    )?;
+
+    trx.commit()?;
+
+    Ok(())
+}
+
+pub fn remove_task_category(conn: &mut Connection, task_id: i64, category: &str) -> Result<()> {
+    let trx = conn.transaction()?;
+    let now = get_now();
+
+    let category_repository = CategoryRepository::create(&trx);
+    let action_repository = ActionRepository::create(&trx);
+
+    category_repository.delete_category(task_id, category)?;
+
+    action_repository.create_action(
+        ActionEnum::Category {
+            action_type: ActionTypeEnum::Delete,
+            category: category.to_string(),
+            task_id,
+        },
+        &now.to_string(),
+    )?;
+
+    trx.commit()?;
+
+    Ok(())
+}
+
+pub fn batch_rename_category(
+    conn: &mut Connection,
+    old_category: &str,
+    new_category: &str,
+) -> Result<()> {
+    let trx = conn.transaction()?;
+    let now = get_now();
+
+    let category_repository = CategoryRepository::create(&trx);
+    let action_repository = ActionRepository::create(&trx);
+
+    category_repository.batch_rename_category(old_category, new_category)?;
+
+    action_repository.create_action(
+        ActionEnum::BatchCategoryRename {
+            old_category: old_category.to_string(),
+            new_category: new_category.to_string(),
+        },
+        &now.to_string(),
+    )?;
+
+    trx.commit()?;
+
+    Ok(())
+}
+pub fn batch_delete_category(conn: &mut Connection, category: &str) -> Result<()> {
+    let trx = conn.transaction()?;
+    let now = get_now();
+
+    let category_repository = CategoryRepository::create(&trx);
+    let action_repository = ActionRepository::create(&trx);
+
+    let task_ids = category_repository.get_category_task_ids(category)?;
+
+    category_repository.batch_delete_category(category)?;
+
+    action_repository.create_action(
+        ActionEnum::BatchCategoryDelete {
+            task_ids,
+            category: category.to_string(),
+        },
+        &now.to_string(),
+    )?;
+
+    trx.commit()?;
+
+    Ok(())
 }
