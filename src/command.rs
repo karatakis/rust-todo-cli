@@ -50,6 +50,8 @@ pub enum RootCommandsEnum {
         #[arg(short, long, value_name = "LIMIT", help = "Number of items to show", default_value = "10", value_parser = clap::value_parser!(u64).range(1..))]
         limit: u64,
     },
+    #[command(about = "1) Delete archived, 2) Delete actions log, 3) Archive all completed tasks")]
+    Housekeeping,
     #[command(about = "All operations for task categories")]
     Category {
         #[command(subcommand)]

@@ -4,7 +4,7 @@ use sea_query::{Expr, Query, SqliteQueryBuilder};
 
 use crate::models::{
     AddTask, OrderByEnum, QueryTaskPayload, Task, TaskCategoryIden, TaskFtsIden, TaskIden,
-    UpdateTask,
+    TaskStatusEnum, UpdateTask,
 };
 
 use super::get_now;
@@ -329,8 +329,6 @@ impl<'a> TaskRepository<'a> {
 
         let sql = sql.to_string(SqliteQueryBuilder);
 
-        println!("{}", sql);
-
         let data = self
             .conn
             .prepare(&sql)?
@@ -349,6 +347,51 @@ impl<'a> TaskRepository<'a> {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(data)
+    }
+
+    /**
+     * Used to delete all archived tasks
+     */
+    pub fn delete_archived(&self) -> Result<i64> {
+        let sql = Query::select()
+            .from(TaskIden::Table)
+            .expr(Expr::col(TaskIden::Id).count())
+            .and_where(Expr::col(TaskIden::Status).eq(TaskStatusEnum::Archived))
+            .to_string(SqliteQueryBuilder);
+
+        let count = self.conn.query_row(&sql, (), |row| Ok(row.get(0)?))?;
+
+        let sql = Query::delete()
+            .from_table(TaskIden::Table)
+            .and_where(Expr::col(TaskIden::Status).eq(TaskStatusEnum::Archived))
+            .to_string(SqliteQueryBuilder);
+
+        self.conn.execute(&sql, ())?;
+
+        Ok(count)
+    }
+
+    /**
+     * Used to archive all completed tasks
+     */
+    pub fn archive_tasks(&self) -> Result<i64> {
+        let sql = Query::select()
+            .from(TaskIden::Table)
+            .expr(Expr::col(TaskIden::Id).count())
+            .and_where(Expr::col(TaskIden::Status).eq(TaskStatusEnum::Done))
+            .to_string(SqliteQueryBuilder);
+
+        let count = self.conn.query_row(&sql, (), |row| Ok(row.get(0)?))?;
+
+        let sql = Query::update()
+            .table(TaskIden::Table)
+            .and_where(Expr::col(TaskIden::Status).eq(TaskStatusEnum::Done))
+            .value(TaskIden::Status, TaskStatusEnum::Archived)
+            .to_string(SqliteQueryBuilder);
+
+        self.conn.execute(&sql, ())?;
+
+        Ok(count)
     }
 }
 

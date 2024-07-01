@@ -83,14 +83,21 @@ pub fn info_parser(value: &str) -> Result<String> {
     function(value)
 }
 
-pub fn string_len_parser(low: usize, high: usize) -> impl Fn(&str) -> Result<std::string::String, anyhow::Error> {
+pub fn string_len_parser(
+    low: usize,
+    high: usize,
+) -> impl Fn(&str) -> Result<std::string::String, anyhow::Error> {
     return move |value: &str| -> Result<String> {
         let len = value.len();
 
         if len < low || len > high {
-            Err(anyhow::anyhow!("Field not withing bounds [{}, {}]", low, high))
+            Err(anyhow::anyhow!(
+                "Field not withing bounds [{}, {}]",
+                low,
+                high
+            ))
         } else {
             Ok(value.to_string())
         }
-    }
+    };
 }

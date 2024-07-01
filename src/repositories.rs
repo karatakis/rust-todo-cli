@@ -434,6 +434,22 @@ pub fn query_tasks(conn: &Connection, payload: QueryTaskPayload) -> Result<Vec<T
     task_repository.query_tasks(payload)
 }
 
+/**
+ * Used to clean archived and actions to speedup database
+ */
+pub fn clean_database(conn: &Connection) -> Result<(i64, i64, i64)> {
+    let action_repository = ActionRepository::create(&conn);
+    let task_repository = TaskRepository::create(&conn);
+
+    let actions_deleted = action_repository.delete_all()?;
+
+    let tasks_deleted = task_repository.delete_archived()?;
+
+    let tasks_updated = task_repository.archive_tasks()?;
+
+    Ok((actions_deleted, tasks_deleted, tasks_updated))
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

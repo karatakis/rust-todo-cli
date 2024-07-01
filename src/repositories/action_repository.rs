@@ -151,6 +151,26 @@ impl<'a> ActionRepository<'a> {
 
         Ok(rows)
     }
+
+    /**
+     * Used to delete all actions
+     */
+    pub fn delete_all(&self) -> Result<i64> {
+        let sql = Query::select()
+            .from(ActionIden::Table)
+            .expr(Expr::col(ActionIden::Id).count())
+            .to_string(SqliteQueryBuilder);
+
+        let count = self.conn.query_row(&sql, (), |row| Ok(row.get(0)?))?;
+
+        let sql = Query::delete()
+            .from_table(ActionIden::Table)
+            .to_string(SqliteQueryBuilder);
+
+        self.conn.execute(&sql, ())?;
+
+        Ok(count)
+    }
 }
 
 #[cfg(test)]

@@ -131,7 +131,16 @@ fn main() -> Result<()> {
                     sort_title,
                 };
                 let tasks = query_tasks(&conn, payload)?;
-                println!("{:?}", tasks);
+                println!("========== TASKS ==========");
+                for task in tasks {
+                    println!(
+                        "(#{}) - [{}] - [Status: {}] - [{}]",
+                        task.id,
+                        task.title,
+                        task.status.to_string(),
+                        task.created_at
+                    );
+                }
             }
             command::TaskCommandsEnum::Read { id } => {
                 let repository = TaskRepository::create(&conn);
@@ -269,6 +278,20 @@ fn main() -> Result<()> {
                 println!("[Category][Batch][Delete] - (#{})", category);
             }
         },
+        command::RootCommandsEnum::Housekeeping => {
+            let proceed = ask_permission("This operation is going to:\n 1) Delete all actions\n 2) Delete all archived tasks\n 3) Archive all completed tasks\n(y/N)", false)?;
+
+            if proceed {
+                let (actions_deleted, tasks_deleted, tasks_updated) =
+                    repositories::clean_database(&conn)?;
+                println!(
+                    "[Actions deleted: {}] - [Tasks deleted: {}] - [Tasks updated: {}]",
+                    actions_deleted, tasks_deleted, tasks_updated
+                );
+            } else {
+                println!("Operation Canceled")
+            }
+        }
     }
 
     conn.commit()?;
