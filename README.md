@@ -2,6 +2,10 @@
 
 A TODO task management CLI application
 
+## Demo
+
+![Demo video gif](./docs/first.gif)
+
 ## Testing
 
 * `cargo tarpaulin --out Html` get test coverage report
@@ -31,8 +35,8 @@ A TODO task management CLI application
 * * List [DONE]
 * * Attach to Task [DONE]
 * * Detach from to Task [DONE]
-* Housekeeping Command [PLANED]
-* * Clear logs [PLANED]
-* * Clear archived [PLANED]
-* Archive completed command [PLANED]
+* Housekeeping Command [DONE]
+* * Clear logs [DONE]
+* * Clear archived [DONE]
+* Archive completed command [DONE]
 * Testing [DONE]
