@@ -20,6 +20,8 @@ fn main() -> Result<()> {
     let mut conn = Connection::open(&matches.file)?;
     setup_database(&conn)?;
 
+    let mut conn = conn.transaction()?;
+
     match matches.command {
         command::RootCommandsEnum::Task { command } => match command {
             command::TaskCommandsEnum::Add {
@@ -112,10 +114,8 @@ fn main() -> Result<()> {
                 let repository = TaskRepository::create(&conn);
                 let category_repository = CategoryRepository::create(&conn);
 
-
                 match repository.get_task(id)? {
                     Some(task) => {
-                        // TODO fix this
                         let categories = category_repository.fetch_task_categories(id)?;
                         let header = format!("=== (#{}) [{}] ===", id, task.title);
                         println!("{}", header);
@@ -162,7 +162,7 @@ fn main() -> Result<()> {
         command::RootCommandsEnum::Redo { force } => {
             let repository = ActionRepository::create(&conn);
 
-            let action = repository.get_fist_restored_action()?;
+            let action = repository.get_first_restored_action()?;
             let proceed = ask_permission(
                 &format!("Do you want to redo: {}? (y/N)", action.action.to_string()),
                 force,
@@ -247,5 +247,8 @@ fn main() -> Result<()> {
             }
         },
     }
+
+    conn.commit()?;
+
     Ok(())
 }

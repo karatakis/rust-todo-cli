@@ -161,6 +161,7 @@ pub enum TaskCommandsEnum {
             help = "Creation date of the task",
             value_parser = created_at_parser
         )]
+        // TODO test it
         date: Option<Date>,
         #[arg(short, long, help = "Force operation without confirmation")]
         force: bool,

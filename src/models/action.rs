@@ -8,7 +8,7 @@ use time::Date;
 
 use super::TaskStatusEnum;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Action {
     pub id: i64,
     pub action: ActionEnum,
@@ -26,7 +26,7 @@ pub enum ActionIden {
     CreatedAt,
 }
 
-#[derive(Debug, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub enum ActionTypeEnum {
     Create,
     Update,
@@ -43,7 +43,7 @@ impl ToString for ActionTypeEnum {
     }
 }
 
-#[derive(Debug, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub enum ActionEnum {
     Task {
         action_type: ActionTypeEnum,

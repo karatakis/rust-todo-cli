@@ -2,25 +2,9 @@
 
 A TODO task management CLI application
 
-## Snippets
+## Testing
 
-```rust
-pub fn task_exists(&self, id: i64) -> Result<bool> {
-    let sql = Query::select()
-        .expr(Func::sum(Expr::col((TaskIden::Table, TaskIden::Id))))
-        .from(TaskIden::Table)
-        .and_where(Expr::col(TaskIden::Id).eq(id))
-        .to_string(SqliteQueryBuilder);
-
-    let count: usize = self.conn.query_row(&sql, (), |row| Ok(row.get(0)?))?;
-
-    if count > 0 {
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-```
+* `cargo tarpaulin --out Html` get test coverage report
 
 ## TODOs
 
@@ -50,3 +34,4 @@ pub fn task_exists(&self, id: i64) -> Result<bool> {
 * * Clear logs [PLANED]
 * * Clear archived [PLANED]
 * Archive completed command [PLANED]
+* Testing [WIP]

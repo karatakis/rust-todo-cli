@@ -3,7 +3,7 @@ use time::Date;
 
 use super::TaskStatusEnum;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Task {
     pub id: i64,
     pub title: String,

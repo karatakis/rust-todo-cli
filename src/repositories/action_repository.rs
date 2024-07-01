@@ -20,7 +20,7 @@ impl<'a> ActionRepository<'a> {
     }
 
     /**
-     * Used to create a single (reversable) action record
+     * Used to create a single (reversible) action record
      */
     pub fn create_action(&self, action: ActionEnum, now: &str) -> Result<i64> {
         // create new action
@@ -48,7 +48,7 @@ impl<'a> ActionRepository<'a> {
     }
 
     /**
-     * Used to create a single (reversable) action record
+     * Used to create a single (reversible) action record
      */
     pub fn update_action(&self, id: i64, action: ActionEnum, restored: bool) -> Result<()> {
         let sql = Query::update()
@@ -96,7 +96,7 @@ impl<'a> ActionRepository<'a> {
     /**
      * Used to get the last restored Action log record
      */
-    pub fn get_fist_restored_action(&self) -> Result<Action> {
+    pub fn get_first_restored_action(&self) -> Result<Action> {
         let sql = Query::select()
             .from(ActionIden::Table)
             .columns([
@@ -149,5 +149,128 @@ impl<'a> ActionRepository<'a> {
             .collect::<Result<Vec<Action>, _>>()?;
 
         Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use rusqlite::Connection;
+
+    use crate::{
+        models::{setup_database, Action, ActionEnum},
+        repositories::get_now,
+    };
+
+    use super::ActionRepository;
+
+    #[test]
+    fn test_create_update() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        setup_database(&conn)?;
+
+        let repository = ActionRepository::create(&conn);
+
+        let now = get_now();
+
+        let action = ActionEnum::BatchCategoryRename {
+            old_category: "test".into(),
+            new_category: "tost".into(),
+        };
+
+        // test create
+        let id = repository.create_action(action.clone(), &now.to_string())?;
+        let actions = repository.fetch_actions(1)?;
+        assert_eq!(
+            vec![Action {
+                id,
+                created_at: now,
+                action,
+                restored: false
+            }],
+            actions
+        );
+
+        // test update
+        let action = ActionEnum::BatchCategoryRename {
+            old_category: "1".into(),
+            new_category: "2".into(),
+        };
+        repository.update_action(id, action.clone(), true)?;
+        let actions = repository.fetch_actions(1)?;
+        assert_eq!(
+            vec![Action {
+                id,
+                created_at: now,
+                action,
+                restored: true
+            }],
+            actions
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_last_first_unrestored_restored_action() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        setup_database(&conn)?;
+
+        let repository = ActionRepository::create(&conn);
+
+        let now = get_now();
+
+        let old_texts = vec!["one", "two", "three", "four"];
+        let new_texts = vec!["1", "2", "3", "4"];
+
+        for id in 0..4 {
+            let action = ActionEnum::BatchCategoryRename {
+                old_category: old_texts.get(id).unwrap().to_string(),
+                new_category: new_texts.get(id).unwrap().to_string(),
+            };
+
+            repository.create_action(action, &now.to_string())?;
+        }
+
+        for id in 2..4 {
+            let action = ActionEnum::BatchCategoryRename {
+                old_category: old_texts.get(id).unwrap().to_string(),
+                new_category: new_texts.get(id).unwrap().to_string(),
+            };
+
+            repository.update_action((id + 1) as i64, action, true)?;
+        }
+
+        // test get last unrestored
+        let last = repository.get_last_unrestored_action()?;
+        assert_eq!(
+            Action {
+                id: 2,
+                created_at: now,
+                action: ActionEnum::BatchCategoryRename {
+                    old_category: old_texts.get(1).unwrap().to_string(),
+                    new_category: new_texts.get(1).unwrap().to_string(),
+                },
+                restored: false
+            },
+            last
+        );
+
+        // test get first restored
+        let first = repository.get_first_restored_action()?;
+        assert_eq!(
+            Action {
+                id: 3,
+                created_at: now,
+                action: ActionEnum::BatchCategoryRename {
+                    old_category: old_texts.get(2).unwrap().to_string(),
+                    new_category: new_texts.get(2).unwrap().to_string(),
+                },
+                restored: true
+            },
+            first
+        );
+
+        Ok(())
     }
 }

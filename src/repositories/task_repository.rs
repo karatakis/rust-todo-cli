@@ -198,3 +198,102 @@ impl<'a> TaskRepository<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use rusqlite::Connection;
+
+    use crate::{
+        models::{setup_database, AddTask, TaskStatusEnum, UpdateTask},
+        repositories::get_now,
+    };
+
+    use super::TaskRepository;
+
+    #[test]
+    fn test_crud_tasks() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        setup_database(&conn)?;
+
+        let now = get_now();
+
+        let repository = TaskRepository::create(&conn);
+
+        // test create and fetch
+        let fetched_task = repository.get_task(1)?;
+        assert_eq!(None, fetched_task);
+
+        let task = repository.create_task(AddTask {
+            title: "Test Task".into(),
+            info: None,
+            deadline: None,
+            categories: None,
+            status: TaskStatusEnum::Undone,
+            created_at: now,
+        })?;
+        assert_eq!(1, task.id);
+
+        let fetched_task = repository.get_task(1)?;
+        assert_eq!(Some(task.clone()), fetched_task);
+        assert_eq!("Test Task", &fetched_task.unwrap().title);
+
+        // test update task
+        let res = repository.update_task(
+            1,
+            UpdateTask {
+                title: None,
+                info: None,
+                deadline: None,
+                status: None,
+                created_at: None,
+            },
+            &now.to_string(),
+        );
+
+        if let Err(_) = res {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+
+        repository.update_task(
+            1,
+            UpdateTask {
+                title: Some("New Title".into()),
+                info: Some(Some("Test".into())),
+                deadline: Some(Some(now)),
+                status: Some(TaskStatusEnum::Done),
+                created_at: Some(now),
+            },
+            &now.to_string(),
+        )?;
+
+        let fetched_task = repository.get_task(1)?.unwrap();
+        assert_eq!("New Title", &fetched_task.title);
+
+        // test delete task
+        repository.delete_task(&fetched_task)?;
+        let fetched_task = repository.get_task(1)?;
+        assert_eq!(None, fetched_task);
+
+        // test create with fixed id
+        let task = repository.create_task_with_id(
+            1,
+            AddTask {
+                title: "Test Task".into(),
+                info: None,
+                deadline: None,
+                categories: None,
+                status: crate::models::TaskStatusEnum::Undone,
+                created_at: now,
+            },
+        )?;
+        assert_eq!(1, task.id);
+
+        let fetched_task = repository.get_task(1)?;
+        assert_eq!(Some(task), fetched_task);
+
+        Ok(())
+    }
+}

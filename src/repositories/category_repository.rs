@@ -64,7 +64,9 @@ impl<'a> CategoryRepository<'a> {
     pub fn all_categories(&self) -> Result<Vec<(String, i64)>> {
         let sql = Query::select()
             .expr(Expr::col(TaskCategoryIden::TaskId).count())
-            .expr(Expr::col(TaskCategoryIden::Category))
+            .column(TaskCategoryIden::Category)
+            .from(TaskCategoryIden::Table)
+            .group_by_col(TaskCategoryIden::Category)
             .to_string(SqliteQueryBuilder);
 
         let records: Vec<_> = self
@@ -86,6 +88,7 @@ impl<'a> CategoryRepository<'a> {
      */
     pub fn fetch_task_categories(&self, task_id: i64) -> Result<Vec<String>> {
         let sql = Query::select()
+            .from(TaskCategoryIden::Table)
             .column(TaskCategoryIden::Category)
             .and_where(Expr::col(TaskCategoryIden::TaskId).eq(task_id))
             .to_string(SqliteQueryBuilder);
@@ -94,7 +97,7 @@ impl<'a> CategoryRepository<'a> {
             .conn
             .prepare(&sql)?
             .query_map((), |row| {
-                let category: String = row.get(1)?;
+                let category: String = row.get(0)?;
 
                 Ok(category)
             })?
@@ -187,6 +190,10 @@ impl<'a> CategoryRepository<'a> {
             sql.values([(*id).into(), category.into()])?;
         }
 
+        let sql = sql.to_string(SqliteQueryBuilder);
+
+        self.conn.execute(&sql, ())?;
+
         Ok(())
     }
 
@@ -237,6 +244,249 @@ impl<'a> CategoryRepository<'a> {
             .to_string(SqliteQueryBuilder);
 
         self.conn.execute(&sql, ())?;
+
+        Ok(())
+    }
+
+    /**
+     * Used to batch delete task categories
+     * TODO: test
+     */
+    pub fn delete_task_categories(&self, task_id: i64) -> Result<()> {
+        let sql = Query::delete()
+            .from_table(TaskCategoryIden::Table)
+            .and_where(Expr::col(TaskCategoryIden::TaskId).eq(task_id))
+            .to_string(SqliteQueryBuilder);
+
+        self.conn.execute(&sql, ())?;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use rusqlite::Connection;
+
+    use crate::{
+        models::{setup_database, AddTask, TaskStatusEnum},
+        repositories::{get_now, task_repository::TaskRepository},
+    };
+
+    use super::CategoryRepository;
+
+    #[test]
+    fn test_singular_crud_category() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        setup_database(&conn)?;
+
+        let now = get_now();
+
+        let repository = CategoryRepository::create(&conn);
+        let task_repository = TaskRepository::create(&conn);
+
+        // prepare
+        let task = task_repository.create_task(AddTask {
+            title: String::from("Demo"),
+            info: None,
+            deadline: None,
+            categories: None,
+            status: TaskStatusEnum::Undone,
+            created_at: now,
+        })?;
+        let categories = repository.fetch_task_categories(task.id)?;
+        assert_eq!(0, categories.len());
+
+        // test create
+        repository.create_category(task.id, "test_category")?;
+        let data = repository.fetch_category(task.id, "test_category")?;
+        assert_eq!(Some("test_category".into()), data);
+
+        // test rename
+        let data = repository.fetch_category(task.id, "dummy")?;
+        assert_eq!(None, data);
+        repository.rename_category(task.id, "test_category", "dummy")?;
+        let data = repository.fetch_category(task.id, "dummy")?;
+        assert_eq!(Some("dummy".into()), data);
+        let data = repository.fetch_category(task.id, "test_category")?;
+        assert_eq!(None, data);
+
+        // test rename not found
+        if let Err(_) = repository.rename_category(task.id, "404", "impossible") {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+
+        // test delete not found
+        if let Err(_) = repository.delete_category(task.id, "404") {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+
+        // test delete
+        repository.delete_category(task.id, "dummy")?;
+        let data = repository.fetch_category(task.id, "dummy")?;
+        assert_eq!(None, data);
+        let data = repository.fetch_category(task.id, "test_category")?;
+        assert_eq!(None, data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_batch_crud_category() -> Result<()> {
+        let conn = Connection::open_in_memory()?;
+        setup_database(&conn)?;
+
+        let now = get_now();
+
+        let repository = CategoryRepository::create(&conn);
+        let task_repository = TaskRepository::create(&conn);
+
+        // prepare
+        let task_one = task_repository.create_task(AddTask {
+            title: String::from("Task One"),
+            info: None,
+            deadline: None,
+            categories: None,
+            status: TaskStatusEnum::Undone,
+            created_at: now,
+        })?;
+        let categories = repository.fetch_task_categories(task_one.id)?;
+        assert_eq!(0, categories.len());
+
+        let task_two = task_repository.create_task(AddTask {
+            title: String::from("Task Two"),
+            info: None,
+            deadline: None,
+            categories: None,
+            status: TaskStatusEnum::Undone,
+            created_at: now,
+        })?;
+        let categories = repository.fetch_task_categories(task_two.id)?;
+        assert_eq!(0, categories.len());
+
+        let task_three = task_repository.create_task(AddTask {
+            title: String::from("Task Three"),
+            info: None,
+            deadline: None,
+            categories: None,
+            status: TaskStatusEnum::Undone,
+            created_at: now,
+        })?;
+        let categories = repository.fetch_task_categories(task_three.id)?;
+        assert_eq!(0, categories.len());
+
+        let mut task_one_categories: Vec<String> = vec!["one".into(), "two".into(), "three".into()];
+        task_one_categories.sort();
+
+        let mut task_two_categories: Vec<String> =
+            vec!["three".into(), "four".into(), "five".into()];
+        task_two_categories.sort();
+
+        // test create
+        repository.batch_create_task_categories(task_one.id, &task_one_categories)?;
+        let mut categories = repository.fetch_task_categories(task_one.id)?;
+        categories.sort();
+        assert_eq!(task_one_categories, categories);
+        let categories = repository.fetch_task_categories(task_two.id)?;
+        assert_eq!(0, categories.len());
+
+        repository.batch_create_task_categories(task_two.id, &task_two_categories)?;
+        let categories = repository.fetch_task_categories(task_one.id)?;
+        assert_eq!(task_one_categories, categories);
+        let categories = repository.fetch_task_categories(task_two.id)?;
+        assert_eq!(task_two_categories, categories);
+        let categories = repository.fetch_task_categories(task_three.id)?;
+        assert_eq!(0, categories.len());
+
+        // test get all
+        let mut all_categories = repository.all_categories()?;
+        all_categories.sort();
+        let mut expected = vec![
+            ("one".into(), 1),
+            ("two".into(), 1),
+            ("three".into(), 2),
+            ("four".into(), 1),
+            ("five".into(), 1),
+        ];
+        expected.sort();
+        assert_eq!(expected, all_categories);
+
+        // test create
+        repository.batch_create_category(&vec![1, 2, 3], "test")?;
+        let mut all_categories = repository.all_categories()?;
+        all_categories.sort();
+        let mut expected = vec![
+            ("one".into(), 1),
+            ("two".into(), 1),
+            ("three".into(), 2),
+            ("four".into(), 1),
+            ("five".into(), 1),
+            ("test".into(), 3),
+        ];
+        expected.sort();
+        assert_eq!(expected, all_categories);
+
+        let categories = repository.fetch_task_categories(task_three.id)?;
+        assert_eq!(vec!["test"], categories);
+
+        // test get ids
+        let mut ids = repository.get_category_task_ids("test")?;
+        ids.sort();
+        assert_eq!(vec![1, 2, 3], ids);
+
+        // test rename
+        repository.batch_rename_category("test", "tost")?;
+        let mut all_categories = repository.all_categories()?;
+        all_categories.sort();
+        let mut expected = vec![
+            ("one".into(), 1),
+            ("two".into(), 1),
+            ("three".into(), 2),
+            ("four".into(), 1),
+            ("five".into(), 1),
+            ("tost".into(), 3),
+        ];
+        expected.sort();
+        assert_eq!(expected, all_categories);
+        let categories = repository.fetch_task_categories(task_three.id)?;
+        assert_eq!(vec!["tost"], categories);
+
+        let mut ids = repository.get_category_task_ids("tost")?;
+        ids.sort();
+        assert_eq!(vec![1, 2, 3], ids);
+        let mut ids = repository.get_category_task_ids("test")?;
+        ids.sort();
+        assert_eq!(0, ids.len());
+
+        // test delete
+        repository.batch_delete_category("tost")?;
+        let mut all_categories = repository.all_categories()?;
+        all_categories.sort();
+        let mut expected = vec![
+            ("one".into(), 1),
+            ("two".into(), 1),
+            ("three".into(), 2),
+            ("four".into(), 1),
+            ("five".into(), 1),
+        ];
+        expected.sort();
+        assert_eq!(expected, all_categories);
+
+        let categories = repository.fetch_task_categories(task_three.id)?;
+        assert_eq!(0, categories.len());
+
+        let mut ids = repository.get_category_task_ids("tost")?;
+        ids.sort();
+        assert_eq!(0, ids.len());
+
+        let mut ids = repository.get_category_task_ids("test")?;
+        ids.sort();
+        assert_eq!(0, ids.len());
 
         Ok(())
     }
