@@ -122,6 +122,7 @@ impl<'a> ActionRepository<'a> {
         Ok(action)
     }
 
+    /** Used to fetch all actions */
     pub fn fetch_actions(&self, limit: u64) -> Result<Vec<Action>> {
         let sql = Query::select()
             .from(ActionIden::Table)
@@ -179,34 +180,39 @@ mod tests {
         };
 
         // test create
-        let id = repository.create_action(action.clone(), &now.to_string())?;
-        let actions = repository.fetch_actions(1)?;
-        assert_eq!(
-            vec![Action {
-                id,
-                created_at: now,
-                action,
-                restored: false
-            }],
-            actions
-        );
+        let id = {
+            let id = repository.create_action(action.clone(), &now.to_string())?;
+            let actions = repository.fetch_actions(1)?;
+            assert_eq!(
+                vec![Action {
+                    id,
+                    created_at: now,
+                    action,
+                    restored: false
+                }],
+                actions
+            );
+            id
+        };
 
         // test update
-        let action = ActionEnum::BatchCategoryRename {
-            old_category: "1".into(),
-            new_category: "2".into(),
-        };
-        repository.update_action(id, action.clone(), true)?;
-        let actions = repository.fetch_actions(1)?;
-        assert_eq!(
-            vec![Action {
-                id,
-                created_at: now,
-                action,
-                restored: true
-            }],
-            actions
-        );
+        {
+            let action = ActionEnum::BatchCategoryRename {
+                old_category: "1".into(),
+                new_category: "2".into(),
+            };
+            repository.update_action(id, action.clone(), true)?;
+            let actions = repository.fetch_actions(1)?;
+            assert_eq!(
+                vec![Action {
+                    id,
+                    created_at: now,
+                    action,
+                    restored: true
+                }],
+                actions
+            );
+        }
 
         Ok(())
     }
@@ -242,34 +248,38 @@ mod tests {
         }
 
         // test get last unrestored
-        let last = repository.get_last_unrestored_action()?;
-        assert_eq!(
-            Action {
-                id: 2,
-                created_at: now,
-                action: ActionEnum::BatchCategoryRename {
-                    old_category: old_texts.get(1).unwrap().to_string(),
-                    new_category: new_texts.get(1).unwrap().to_string(),
+        {
+            let last = repository.get_last_unrestored_action()?;
+            assert_eq!(
+                Action {
+                    id: 2,
+                    created_at: now,
+                    action: ActionEnum::BatchCategoryRename {
+                        old_category: old_texts.get(1).unwrap().to_string(),
+                        new_category: new_texts.get(1).unwrap().to_string(),
+                    },
+                    restored: false
                 },
-                restored: false
-            },
-            last
-        );
+                last
+            );
+        }
 
         // test get first restored
-        let first = repository.get_first_restored_action()?;
-        assert_eq!(
-            Action {
-                id: 3,
-                created_at: now,
-                action: ActionEnum::BatchCategoryRename {
-                    old_category: old_texts.get(2).unwrap().to_string(),
-                    new_category: new_texts.get(2).unwrap().to_string(),
+        {
+            let first = repository.get_first_restored_action()?;
+            assert_eq!(
+                Action {
+                    id: 3,
+                    created_at: now,
+                    action: ActionEnum::BatchCategoryRename {
+                        old_category: old_texts.get(2).unwrap().to_string(),
+                        new_category: new_texts.get(2).unwrap().to_string(),
+                    },
+                    restored: true
                 },
-                restored: true
-            },
-            first
-        );
+                first
+            );
+        }
 
         Ok(())
     }

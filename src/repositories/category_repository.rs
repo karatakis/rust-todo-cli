@@ -42,6 +42,10 @@ impl<'a> CategoryRepository<'a> {
         task_id: i64,
         categories: &Vec<String>,
     ) -> Result<()> {
+        if categories.len() == 0 {
+            return Ok(())
+        }
+
         let mut sql = Query::insert();
 
         sql.into_table(TaskCategoryIden::Table)

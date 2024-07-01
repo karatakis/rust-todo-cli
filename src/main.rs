@@ -7,7 +7,7 @@ use repositories::{
     task_repository::TaskRepository,
 };
 use rusqlite::Connection;
-use utils::ask_permission;
+use utils::{ask_permission, optional_date_parser};
 
 mod command;
 mod models;
@@ -85,6 +85,7 @@ fn main() -> Result<()> {
                 };
 
                 let info = info.map(|info| if info == "" { None } else { Some(info) });
+                let deadline = deadline.map(|v| optional_date_parser(&v)).transpose()?;
 
                 let new_task = UpdateTask {
                     title,

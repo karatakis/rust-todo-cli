@@ -1013,10 +1013,7 @@ mod tests {
         {
             let action = action_repository.get_last_unrestored_action()?;
             match &action.action {
-                ActionEnum::BatchCategoryDelete {
-                    category,
-                    task_ids,
-                } => {
+                ActionEnum::BatchCategoryDelete { category, task_ids } => {
                     assert_eq!("too", category);
                     assert!(task_ids.contains(&1));
                     assert!(task_ids.contains(&2));
@@ -1039,10 +1036,7 @@ mod tests {
 
             let action = action_repository.get_first_restored_action()?;
             match &action.action {
-                ActionEnum::BatchCategoryDelete {
-                    category,
-                    task_ids,
-                } => {
+                ActionEnum::BatchCategoryDelete { category, task_ids } => {
                     assert_eq!("too", category);
                     assert!(task_ids.contains(&1));
                     assert!(task_ids.contains(&2));
@@ -1063,10 +1057,7 @@ mod tests {
 
             let action = action_repository.get_last_unrestored_action()?;
             match &action.action {
-                ActionEnum::BatchCategoryDelete {
-                    category,
-                    task_ids,
-                } => {
+                ActionEnum::BatchCategoryDelete { category, task_ids } => {
                     assert_eq!("too", category);
                     assert!(task_ids.contains(&1));
                     assert!(task_ids.contains(&2));

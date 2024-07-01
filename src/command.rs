@@ -74,7 +74,7 @@ pub enum CategoryCommandsEnum {
         task_id: i64,
         #[arg(index = 2, value_name = "OLD CATEGORY", help = "The old task category")]
         old_category: String,
-        #[arg(index = 2, value_name = "NEW CATEGORY", help = "The new task category")]
+        #[arg(index = 3, value_name = "NEW CATEGORY", help = "The new task category")]
         new_category: String,
     },
     #[command(about = "Remove a category from a task")]
@@ -86,14 +86,14 @@ pub enum CategoryCommandsEnum {
     },
     #[command(about = "Batch rename a task")]
     BatchRename {
-        #[arg(index = 2, value_name = "OLD CATEGORY", help = "The old task category")]
+        #[arg(index = 1, value_name = "OLD CATEGORY", help = "The old task category")]
         old_category: String,
         #[arg(index = 2, value_name = "NEW CATEGORY", help = "The new task category")]
         new_category: String,
     },
     #[command(about = "Batch delete a task")]
     BatchDelete {
-        #[arg(index = 2, value_name = "CATEGORY", help = "The task category")]
+        #[arg(index = 1, value_name = "CATEGORY", help = "The task category")]
         category: String,
     },
 }
@@ -147,11 +147,9 @@ pub enum TaskCommandsEnum {
             short,
             long,
             value_name = "DEADLINE",
-            help = "Deadline date of the task",
-            value_parser = date_parser
+            help = "Deadline date of the task"
         )]
-        // TODO test it
-        deadline: Option<Option<Date>>,
+        deadline: Option<String>,
         #[arg(long, short, value_name = "STATUS", help = "Status of the task")]
         status: Option<TaskStatusEnum>,
         #[arg(
@@ -161,7 +159,6 @@ pub enum TaskCommandsEnum {
             help = "Creation date of the task",
             value_parser = created_at_parser
         )]
-        // TODO test it
         date: Option<Date>,
         #[arg(short, long, help = "Force operation without confirmation")]
         force: bool,

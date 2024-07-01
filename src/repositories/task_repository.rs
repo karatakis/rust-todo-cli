@@ -4,6 +4,8 @@ use sea_query::{Expr, Query, SqliteQueryBuilder};
 
 use crate::models::{AddTask, Task, TaskIden, UpdateTask};
 
+use super::get_now;
+
 /**
  * Task database repository
  */
@@ -99,6 +101,8 @@ impl<'a> TaskRepository<'a> {
      * Used to create a single task with specified id
      */
     pub fn create_task_with_id(&self, id: i64, task: AddTask) -> Result<Task> {
+        let now = get_now();
+
         let sql = Query::insert()
             .into_table(TaskIden::Table)
             .columns([
@@ -116,7 +120,7 @@ impl<'a> TaskRepository<'a> {
                 task.info.clone().into(),
                 task.deadline.into(),
                 task.status.into(),
-                task.created_at.into(),
+                now.to_string().into(),
                 task.created_at.into(),
             ])?
             .to_string(SqliteQueryBuilder);
@@ -129,7 +133,7 @@ impl<'a> TaskRepository<'a> {
             info: task.info,
             deadline: task.deadline,
             status: task.status,
-            updated_at: task.created_at,
+            updated_at: now,
             created_at: task.created_at,
             categories: None,
         })
