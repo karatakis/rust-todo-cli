@@ -67,3 +67,30 @@ pub fn created_at_parser(value: &str) -> Result<Date> {
         date_parser(value)
     }
 }
+
+pub fn title_parser(value: &str) -> Result<String> {
+    let function = string_len_parser(1, 1000);
+    function(value)
+}
+
+pub fn category_parser(value: &str) -> Result<String> {
+    let function = string_len_parser(1, 200);
+    function(value)
+}
+
+pub fn info_parser(value: &str) -> Result<String> {
+    let function = string_len_parser(0, 10000);
+    function(value)
+}
+
+pub fn string_len_parser(low: usize, high: usize) -> impl Fn(&str) -> Result<std::string::String, anyhow::Error> {
+    return move |value: &str| -> Result<String> {
+        let len = value.len();
+
+        if len < low || len > high {
+            Err(anyhow::anyhow!("Field not withing bounds [{}, {}]", low, high))
+        } else {
+            Ok(value.to_string())
+        }
+    }
+}

@@ -5,7 +5,7 @@ use time::Date;
 
 use crate::{
     models::{OrderByEnum, TaskStatusEnum},
-    utils::{created_at_parser, date_parser},
+    utils::{category_parser, created_at_parser, date_parser, info_parser, title_parser},
 };
 
 /**
@@ -65,35 +65,35 @@ pub enum CategoryCommandsEnum {
     Add {
         #[arg(index = 1, value_name = "TASK ID", help = "ID of the task", value_parser = clap::value_parser!(i64).range(1..))]
         task_id: i64,
-        #[arg(index = 2, value_name = "CATEGORY", help = "The task category")]
+        #[arg(index = 2, value_name = "CATEGORY", help = "The task category", value_parser = category_parser)]
         category: String,
     },
     #[command(about = "Rename a category from a task")]
     Rename {
         #[arg(index = 1, value_name = "TASK ID", help = "ID of the task", value_parser = clap::value_parser!(i64).range(1..))]
         task_id: i64,
-        #[arg(index = 2, value_name = "OLD CATEGORY", help = "The old task category")]
+        #[arg(index = 2, value_name = "OLD CATEGORY", help = "The old task category", value_parser = category_parser)]
         old_category: String,
-        #[arg(index = 3, value_name = "NEW CATEGORY", help = "The new task category")]
+        #[arg(index = 3, value_name = "NEW CATEGORY", help = "The new task category", value_parser = category_parser)]
         new_category: String,
     },
     #[command(about = "Remove a category from a task")]
     Remove {
         #[arg(index = 1, value_name = "TASK ID", help = "ID of the task", value_parser = clap::value_parser!(i64).range(1..))]
         task_id: i64,
-        #[arg(index = 2, value_name = "CATEGORY", help = "The task category")]
+        #[arg(index = 2, value_name = "CATEGORY", help = "The task category", value_parser = category_parser)]
         category: String,
     },
     #[command(about = "Batch rename a task")]
     BatchRename {
-        #[arg(index = 1, value_name = "OLD CATEGORY", help = "The old task category")]
+        #[arg(index = 1, value_name = "OLD CATEGORY", help = "The old task category", value_parser = category_parser)]
         old_category: String,
-        #[arg(index = 2, value_name = "NEW CATEGORY", help = "The new task category")]
+        #[arg(index = 2, value_name = "NEW CATEGORY", help = "The new task category", value_parser = category_parser)]
         new_category: String,
     },
     #[command(about = "Batch delete a task")]
     BatchDelete {
-        #[arg(index = 1, value_name = "CATEGORY", help = "The task category")]
+        #[arg(index = 1, value_name = "CATEGORY", help = "The task category", value_parser = category_parser)]
         category: String,
     },
 }
@@ -102,9 +102,9 @@ pub enum CategoryCommandsEnum {
 pub enum TaskCommandsEnum {
     #[command(about = "Add a new task")]
     Add {
-        #[arg(index = 1, value_name = "TITLE", help = "Title of the task")]
+        #[arg(index = 1, value_name = "TITLE", help = "Title of the task", value_parser = title_parser)]
         title: String,
-        #[arg(short, long, value_name = "INFO", help = "Info of the task")]
+        #[arg(short, long, value_name = "INFO", help = "Info of the task", value_parser = info_parser)]
         info: Option<String>,
         #[arg(
             short,
@@ -114,7 +114,7 @@ pub enum TaskCommandsEnum {
             value_parser = date_parser
         )]
         deadline: Option<Date>,
-        #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task")]
+        #[arg(short, long, value_name = "CATEGORY", help = "Categories of the task", value_parser = category_parser)]
         categories: Option<Vec<String>>,
         #[arg(long, short, value_name = "STATUS", help = "Status of the task", default_value=TaskStatusEnum::Undone)]
         status: TaskStatusEnum,
@@ -139,9 +139,9 @@ pub enum TaskCommandsEnum {
     Update {
         #[arg(index = 1, value_name = "ID", help = "The target task id", value_parser = clap::value_parser!(i64).range(1..))]
         id: i64,
-        #[arg(long, short, value_name = "TITLE", help = "Title of the task")]
+        #[arg(long, short, value_name = "TITLE", help = "Title of the task", value_parser = title_parser)]
         title: Option<String>,
-        #[arg(short, long, value_name = "INFO", help = "Info of the task")]
+        #[arg(short, long, value_name = "INFO", help = "Info of the task", value_parser = info_parser)]
         info: Option<String>,
         #[arg(
             short,
@@ -168,7 +168,7 @@ pub enum TaskCommandsEnum {
         #[arg(long, short, value_name = "STATUS", help = "Filter by status")]
         status: Option<TaskStatusEnum>,
 
-        #[arg(short, long, value_name = "CATEGORY", help = "Filter by categories")]
+        #[arg(short, long, value_name = "CATEGORY", help = "Filter by categories", value_parser = category_parser)]
         categories: Option<Vec<String>>,
 
         #[arg(
