@@ -1,7 +1,7 @@
 use sea_query::Iden;
 use time::Date;
 
-use super::TaskStatusEnum;
+use super::{OrderByEnum, TaskStatusEnum};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Task {
@@ -28,6 +28,15 @@ pub enum TaskIden {
     CreatedAt,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Iden)]
+pub enum TaskFtsIden {
+    #[iden = "tasks_fts"]
+    Table,
+    Id,
+    Title,
+    Info,
+}
+
 #[derive(Debug)]
 pub struct AddTask {
     pub title: String,
@@ -45,4 +54,16 @@ pub struct UpdateTask {
     pub deadline: Option<Option<Date>>,
     pub status: Option<TaskStatusEnum>,
     pub created_at: Option<Date>,
+}
+
+#[derive(Debug)]
+pub struct QueryTaskPayload {
+    pub status: Option<TaskStatusEnum>,
+    pub categories: Option<Vec<String>>,
+    pub text: Option<String>,
+    pub limit: u64,
+    pub sort_created_at: Option<OrderByEnum>,
+    pub sort_updated_at: Option<OrderByEnum>,
+    pub sort_deadline: Option<OrderByEnum>,
+    pub sort_title: Option<OrderByEnum>,
 }

@@ -11,7 +11,7 @@ pub mod category_repository;
 pub mod task_repository;
 
 use crate::{
-    models::{Action, ActionEnum, ActionTypeEnum, AddTask, Task, UpdateTask},
+    models::{Action, ActionEnum, ActionTypeEnum, AddTask, QueryTaskPayload, Task, UpdateTask},
     utils::{created_at_parser, date_parser},
 };
 
@@ -424,6 +424,14 @@ pub fn batch_delete_category(conn: &Connection, category: &str) -> Result<()> {
     )?;
 
     Ok(())
+}
+
+/**
+ * Used to query tasks
+ */
+pub fn query_tasks(conn: &Connection, payload: QueryTaskPayload) -> Result<Vec<Task>> {
+    let task_repository = TaskRepository::create(&conn);
+    task_repository.query_tasks(payload)
 }
 
 #[cfg(test)]

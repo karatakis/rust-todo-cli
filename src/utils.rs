@@ -46,7 +46,7 @@ pub fn date_parser(value: &str) -> Result<Date> {
 
 pub fn optional_date_parser(value: &str) -> Result<Option<Date>> {
     if value == "" {
-        return Ok(None)
+        return Ok(None);
     }
     Ok(Some(date_parser(value)?))
 }

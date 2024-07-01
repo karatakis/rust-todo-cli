@@ -4,11 +4,13 @@ use sea_query::{ColumnDef, ForeignKey, Index, SqliteQueryBuilder, Table};
 
 pub use action::*;
 pub use category::*;
+pub use order_by_enum::*;
 pub use task::*;
 pub use task_status_enum::*;
 
 mod action;
 mod category;
+mod order_by_enum;
 mod task;
 mod task_status_enum;
 
@@ -34,6 +36,11 @@ pub fn setup_database(conn: &Connection) -> Result<()> {
         .col(ColumnDef::new(TaskIden::CreatedAt).text().not_null())
         .to_string(SqliteQueryBuilder);
     conn.execute(&tasks_table, ())?;
+
+    let tasks_fts_table = "
+        CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5 (id UNINDEXED, title, info);
+    ";
+    conn.execute(&tasks_fts_table, ())?;
 
     let idx = Index::create()
         .if_not_exists()

@@ -7,8 +7,11 @@ use rusqlite::{
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Encode, Decode)]
 pub enum TaskStatusEnum {
+    /// task done
     Done,
+    /// task pending
     Undone,
+    /// task archived
     Archived,
 }
 

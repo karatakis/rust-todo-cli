@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand, ValueHint};
 use time::Date;
 
 use crate::{
-    models::TaskStatusEnum,
+    models::{OrderByEnum, TaskStatusEnum},
     utils::{created_at_parser, date_parser},
 };
 
@@ -47,7 +47,7 @@ pub enum RootCommandsEnum {
     },
     #[command(about = "List last actions")]
     Actions {
-        #[arg(short, long, help = "Number of items to show", default_value = "10", value_parser = clap::value_parser!(u64).range(1..))]
+        #[arg(short, long, value_name = "LIMIT", help = "Number of items to show", default_value = "10", value_parser = clap::value_parser!(u64).range(1..))]
         limit: u64,
     },
     #[command(about = "All operations for task categories")]
@@ -165,13 +165,49 @@ pub enum TaskCommandsEnum {
     },
     #[command(about = "List all the tasks based on query filters")]
     List {
-        #[arg(long, short, value_name = "STATUS", help = "Status of the task")]
+        #[arg(long, short, value_name = "STATUS", help = "Filter by status")]
         status: Option<TaskStatusEnum>,
-        /*
-         * TODO:
-         * Sorting category, date
-         * Fuzzy search
-         */
+
+        #[arg(short, long, value_name = "CATEGORY", help = "Filter by categories")]
+        categories: Option<Vec<String>>,
+
+        #[arg(
+            long,
+            short,
+            value_name = "TEXT",
+            help = "Filter by searching title, info"
+        )]
+        text: Option<String>,
+
+        #[arg(short, long, value_name = "LIMIT", help = "Number of items to show", default_value = "10", value_parser = clap::value_parser!(u64).range(1..))]
+        limit: u64,
+
+        #[arg(
+            long,
+            short = 'a',
+            value_name = "SORT CREATED AT",
+            help = "Sort by created at"
+        )]
+        sort_created_at: Option<OrderByEnum>,
+
+        #[arg(
+            long,
+            short = 'u',
+            value_name = "SORT UPDATE AT",
+            help = "Sort by updated at"
+        )]
+        sort_updated_at: Option<OrderByEnum>,
+
+        #[arg(
+            long,
+            short = 'd',
+            value_name = "SORT DEADLINE",
+            help = "Sort by deadline"
+        )]
+        sort_deadline: Option<OrderByEnum>,
+
+        #[arg(long, short = 'o', value_name = "SORT TITLE", help = "Sort by title")]
+        sort_title: Option<OrderByEnum>,
     },
     #[command(about = "Read an existing task")]
     Read {

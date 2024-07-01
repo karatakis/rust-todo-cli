@@ -43,7 +43,7 @@ impl<'a> CategoryRepository<'a> {
         categories: &Vec<String>,
     ) -> Result<()> {
         if categories.len() == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         let mut sql = Query::insert();

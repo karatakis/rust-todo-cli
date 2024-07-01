@@ -2,7 +2,10 @@ use anyhow::Result;
 use rusqlite::Connection;
 use sea_query::{Expr, Query, SqliteQueryBuilder};
 
-use crate::models::{AddTask, Task, TaskIden, UpdateTask};
+use crate::models::{
+    AddTask, OrderByEnum, QueryTaskPayload, Task, TaskCategoryIden, TaskFtsIden, TaskIden,
+    UpdateTask,
+};
 
 use super::get_now;
 
@@ -85,6 +88,17 @@ impl<'a> TaskRepository<'a> {
         self.conn.execute(&sql, ())?;
         let id = self.conn.last_insert_rowid();
 
+        let sql = Query::insert()
+            .into_table(TaskFtsIden::Table)
+            .columns([TaskFtsIden::Id, TaskFtsIden::Title, TaskFtsIden::Info])
+            .values([
+                id.into(),
+                task.title.clone().into(),
+                task.info.clone().into(),
+            ])?
+            .to_string(SqliteQueryBuilder);
+        self.conn.execute(&sql, ())?;
+
         Ok(Task {
             id,
             title: task.title,
@@ -127,6 +141,17 @@ impl<'a> TaskRepository<'a> {
         self.conn.execute(&sql, ())?;
         let id = self.conn.last_insert_rowid();
 
+        let sql = Query::insert()
+            .into_table(TaskFtsIden::Table)
+            .columns([TaskFtsIden::Id, TaskFtsIden::Title, TaskFtsIden::Info])
+            .values([
+                id.into(),
+                task.title.clone().into(),
+                task.info.clone().into(),
+            ])?
+            .to_string(SqliteQueryBuilder);
+        self.conn.execute(&sql, ())?;
+
         Ok(Task {
             id,
             title: task.title,
@@ -144,20 +169,27 @@ impl<'a> TaskRepository<'a> {
      */
     pub fn update_task(&self, id: i64, new_task: UpdateTask, now: &str) -> Result<()> {
         let mut changes = 0;
+        let mut changes_fts = 0;
 
         let mut sql = Query::update();
+        let mut sql_fts = Query::update();
 
         sql.table(TaskIden::Table);
+        sql_fts.table(TaskFtsIden::Table);
 
         // update only the changed fields
         if let Some(title) = new_task.title {
-            sql.value(TaskIden::Title, title);
+            sql.value(TaskIden::Title, title.clone());
+            sql_fts.value(TaskFtsIden::Title, title);
             changes += 1;
+            changes_fts += 1;
         }
 
         if let Some(info) = new_task.info {
-            sql.value(TaskIden::Info, info);
+            sql.value(TaskIden::Info, info.clone());
+            sql_fts.value(TaskFtsIden::Info, info);
             changes += 1;
+            changes_fts += 1;
         }
 
         if let Some(deadline) = new_task.deadline {
@@ -182,6 +214,13 @@ impl<'a> TaskRepository<'a> {
             let sql = sql.to_string(SqliteQueryBuilder);
             self.conn.execute(&sql, ())?;
 
+            if changes_fts > 0 {
+                sql_fts.and_where(Expr::col(TaskFtsIden::Id).eq(id));
+                let sql = sql_fts.to_string(SqliteQueryBuilder);
+
+                self.conn.execute(&sql, ())?;
+            }
+
             Ok(())
         } else {
             Err(anyhow::anyhow!("No changes found"))
@@ -196,10 +235,120 @@ impl<'a> TaskRepository<'a> {
             .from_table(TaskIden::Table)
             .and_where(Expr::col(TaskIden::Id).eq(task.id))
             .to_string(SqliteQueryBuilder);
+        self.conn.execute(&sql, ())?;
 
+        let sql = Query::delete()
+            .from_table(TaskFtsIden::Table)
+            .and_where(Expr::col(TaskFtsIden::Id).eq(task.id))
+            .to_string(SqliteQueryBuilder);
         self.conn.execute(&sql, ())?;
 
         Ok(())
+    }
+
+    /**
+     * Used to query tasks
+     */
+    pub fn query_tasks(&self, payload: QueryTaskPayload) -> Result<Vec<Task>> {
+        let mut sql = Query::select();
+        sql.from(TaskIden::Table);
+        sql.columns([
+            TaskIden::Id,
+            TaskIden::Title,
+            TaskIden::Info,
+            TaskIden::Deadline,
+            TaskIden::Status,
+            TaskIden::UpdatedAt,
+            TaskIden::CreatedAt,
+        ]);
+
+        if let Some(text) = payload.text {
+            let sub_query = Query::select()
+                .from(TaskFtsIden::Table)
+                .column(TaskFtsIden::Id)
+                .and_where(Expr::col(TaskFtsIden::Table).eq(text))
+                .clone();
+            sql.and_where(Expr::col(TaskIden::Id).in_subquery(sub_query));
+        }
+
+        if let Some(status) = payload.status {
+            sql.and_where(Expr::col(TaskIden::Status).eq(status));
+        }
+
+        if let Some(categories) = payload.categories {
+            let sub_query = Query::select()
+                .from(TaskCategoryIden::Table)
+                .column(TaskCategoryIden::TaskId)
+                .and_where(Expr::col(TaskCategoryIden::Category).is_in(categories))
+                .clone();
+            sql.and_where(Expr::col(TaskIden::Id).in_subquery(sub_query));
+        }
+
+        sql.limit(payload.limit);
+
+        if let Some(sort_created_at) = payload.sort_created_at {
+            match sort_created_at {
+                OrderByEnum::Asc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Asc);
+                }
+                OrderByEnum::Desc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Desc);
+                }
+            }
+        }
+        if let Some(sort_updated_at) = payload.sort_updated_at {
+            match sort_updated_at {
+                OrderByEnum::Asc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Asc);
+                }
+                OrderByEnum::Desc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Desc);
+                }
+            }
+        }
+        if let Some(sort_deadline) = payload.sort_deadline {
+            match sort_deadline {
+                OrderByEnum::Asc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Asc);
+                }
+                OrderByEnum::Desc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Desc);
+                }
+            }
+        }
+        if let Some(sort_title) = payload.sort_title {
+            match sort_title {
+                OrderByEnum::Asc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Asc);
+                }
+                OrderByEnum::Desc => {
+                    sql.order_by(TaskIden::CreatedAt, sea_query::Order::Desc);
+                }
+            }
+        }
+
+        let sql = sql.to_string(SqliteQueryBuilder);
+
+        println!("{}", sql);
+
+        let data = self
+            .conn
+            .prepare(&sql)?
+            .query_map((), |row| {
+                Ok(Task {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    info: row.get(2)?,
+                    deadline: row.get(3)?,
+                    categories: None,
+                    status: row.get(4)?,
+                    updated_at: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(data)
     }
 }
 

@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use command::RootCommand;
-use models::{setup_database, AddTask, UpdateTask};
+use models::{setup_database, AddTask, QueryTaskPayload, UpdateTask};
 use repositories::{
-    action_repository::ActionRepository, category_repository::CategoryRepository,
+    action_repository::ActionRepository, category_repository::CategoryRepository, query_tasks,
     task_repository::TaskRepository,
 };
 use rusqlite::Connection;
@@ -110,7 +110,29 @@ fn main() -> Result<()> {
                     println!("Operation Canceled")
                 }
             }
-            command::TaskCommandsEnum::List { status } => todo!(),
+            command::TaskCommandsEnum::List {
+                status,
+                categories,
+                text,
+                limit,
+                sort_created_at,
+                sort_updated_at,
+                sort_deadline,
+                sort_title,
+            } => {
+                let payload = QueryTaskPayload {
+                    status,
+                    categories,
+                    text,
+                    limit,
+                    sort_created_at,
+                    sort_updated_at,
+                    sort_deadline,
+                    sort_title,
+                };
+                let tasks = query_tasks(&conn, payload)?;
+                println!("{:?}", tasks);
+            }
             command::TaskCommandsEnum::Read { id } => {
                 let repository = TaskRepository::create(&conn);
                 let category_repository = CategoryRepository::create(&conn);
